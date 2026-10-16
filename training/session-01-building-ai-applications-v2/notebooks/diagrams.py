@@ -12,23 +12,22 @@ image, so the notebooks themselves import nothing from here. The usage below is 
     diagrams.show("verification")                # notebook 06
     diagrams.show("architecture", stage=2)       # the six components, one highlighted
 
-Two engines draw the same diagram from the same description:
+Two engines draw the same description:
 
     "svg"        the default: a small layout written here; needs nothing beyond IPython
-    "graphviz"   the Graphviz `dot` program through the `graphviz` package
+    "graphviz"   the Graphviz `dot` program through the `graphviz` package (needs `dot` installed)
     "auto"       Graphviz when `dot` is installed, otherwise "svg"
 
-Drawing with "svg" gives the same picture everywhere, including the outputs
-saved in the notebook.
-
-Either way the result is an SVG displayed in the notebook, so it is saved with
-the notebook's outputs and shows on GitHub without running anything.
+A flow without a `grid` is laid out in columns by the longest path to each node. A flow with a `grid`
+places each node at (column, row); an edge may carry a third item, "above" or "below", to route it
+around the nodes in its row (used for the arrows that return to an earlier box), or "elbow" to step down to
+a lower row.
 """
 
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from html import escape
 
 from IPython.display import SVG, display
@@ -39,24 +38,24 @@ DIM_FILL, DIM_EDGE, DIM_TEXT = "#f3f4f6", "#8a94a3", "#6b7280"
 FONT = "Helvetica, Arial, sans-serif"
 DASH = ' stroke-dasharray="5 4"'
 
-
 ALT = {
     "prompt": "Diagram: the question and the context feed the prompt, which goes to the model and produces the answer.",
-    "knowledge": "Diagram: documents, metadata, chunks, embeddings, vector store, then retrieval and the model in notebook 03.",
-    "retrieval": "Diagram: the question goes to a retriever, which returns top-k passages for the prompt, then the model and an answer with citations.",
-    "tools": "Diagram: the question goes to the model, which calls the get_indicator tool, receives data, and answers; the same tool is served over MCP.",
+    "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, added in notebook 03: the question and the retrieved context from the vector store feed the prompt, then the model and the answer.",
+    "retrieval": "Diagram: the question goes to a retriever, which returns top-k passages; the passages and the question go into the prompt, then the model and an answer with citations.",
+    "tools": "Diagram: the question goes to the model, which calls the get_indicator tool and receives data that returns to the model, which answers with text or an object that matches a schema. Separately, the same tool is served over MCP to any MCP client.",
     "agent": "Diagram: the question goes to the model, which chooses between search_documents and get_indicator, then answers.",
-    "verification": "Diagram: the answer with claim tags goes to pcn-core for verified, flagged or unmarked marks, and to the evaluation suite for a table per question."
+    "verification": "Diagram: the question goes to an agent with tools, which produces an answer with claim tags; pcn-core marks each number as verified, flagged or unmarked. Separately, the evaluation suite produces a table per question.",
 }
 
 
 @dataclass
 class Flow:
-    """Nodes as (id, label, state) with state "normal", "hot", or "dim"; edges as (from, to)."""
+    """Nodes as (id, label, state) with state "normal", "hot", or "dim"; edges as (from, to) or (from, to, route)."""
 
     nodes: list[tuple[str, str, str]]
-    edges: list[tuple[str, str]]
-    note: dict[str, str] = field(default_factory=dict)
+    edges: list[tuple]
+    grid: dict[str, tuple[int, int]] | None = None
+    caption: str = ""
 
     def state(self, node_id: str) -> str:
         return next(s for i, _, s in self.nodes if i == node_id)
@@ -82,9 +81,14 @@ def flow(name: str, stage: int | None = None) -> Flow:
                 ("ch", "chunks", "normal"),
                 ("e", "embeddings", "normal"),
                 ("v", "vector store", "hot"),
-                ("r", "retrieval + model\n(notebook 03)", "dim"),
+                ("q", "question", "dim"),
+                ("p", "prompt\ninstructions +\nretrieved context", "dim"),
+                ("m", "model", "dim"),
+                ("a", "answer", "dim"),
             ],
-            [("d", "md"), ("md", "ch"), ("ch", "e"), ("e", "v"), ("v", "r")],
+            [("d", "md"), ("md", "ch"), ("ch", "e"), ("e", "v"), ("v", "p", "elbow"), ("q", "p"), ("p", "m"), ("m", "a")],
+            grid={"d": (0, 0), "md": (1, 0), "ch": (2, 0), "e": (3, 0), "v": (4, 0), "q": (0, 1), "p": (3, 1), "m": (4, 1), "a": (5, 1)},
+            caption="Dashed boxes: added in notebook 03",
         )
     if name == "retrieval":
         return Flow(
@@ -92,11 +96,12 @@ def flow(name: str, stage: int | None = None) -> Flow:
                 ("q", "question", "normal"),
                 ("r", "retriever", "hot"),
                 ("p", "top-k passages", "hot"),
-                ("pr", "prompt\ninstructions + passages + question", "normal"),
+                ("pr", "prompt\ninstructions + passages\n+ question", "normal"),
                 ("m", "model", "normal"),
                 ("a", "answer\nwith citations", "normal"),
             ],
-            [("q", "r"), ("r", "p"), ("p", "pr"), ("pr", "m"), ("m", "a")],
+            [("q", "r"), ("r", "p"), ("p", "pr"), ("q", "pr", "below"), ("pr", "m"), ("m", "a")],
+            grid={"q": (0, 0), "r": (1, 0), "p": (2, 0), "pr": (3, 0), "m": (4, 0), "a": (5, 0)},
         )
     if name == "tools":
         return Flow(
@@ -106,9 +111,11 @@ def flow(name: str, stage: int | None = None) -> Flow:
                 ("t", "tool call\nget_indicator", "hot"),
                 ("d", "data", "hot"),
                 ("a", "answer, or an object\nthat matches a schema", "normal"),
-                ("mcp", "the same tool over MCP\nany MCP client", "hot"),
+                ("s", "the same tool\nserved over MCP", "hot"),
+                ("c", "any MCP client", "hot"),
             ],
-            [("q", "m"), ("m", "t"), ("t", "d"), ("d", "a"), ("t", "mcp")],
+            [("q", "m"), ("m", "t"), ("t", "d"), ("d", "m", "above"), ("m", "a", "below"), ("s", "c")],
+            grid={"q": (0, 0), "m": (1, 0), "t": (2, 0), "d": (3, 0), "a": (4, 0), "s": (2, 1), "c": (3, 1)},
         )
     if name == "agent":
         return Flow(
@@ -129,11 +136,12 @@ def flow(name: str, stage: int | None = None) -> Flow:
                 ("ag", "agent with tools", "normal"),
                 ("an", "answer with\n<claim> tags", "normal"),
                 ("pcn", "pcn-core", "hot"),
-                ("mk", "verified \u00b7 flagged \u00b7 unmarked", "hot"),
+                ("mk", "verified · flagged · unmarked", "hot"),
                 ("ev", "evaluation suite", "hot"),
                 ("tb", "table per question", "hot"),
             ],
-            [("q", "ag"), ("ag", "an"), ("an", "pcn"), ("pcn", "mk"), ("an", "ev"), ("ev", "tb")],
+            [("q", "ag"), ("ag", "an"), ("an", "pcn"), ("pcn", "mk"), ("ev", "tb")],
+            grid={"q": (0, 0), "ag": (1, 0), "an": (2, 0), "pcn": (3, 0), "mk": (4, 0), "ev": (3, 1), "tb": (4, 1)},
         )
     if name == "architecture":
         if stage is None:
@@ -156,8 +164,8 @@ def flow(name: str, stage: int | None = None) -> Flow:
 def _ranks(f: Flow) -> dict[str, int]:
     rank = {i: 0 for i, _, _ in f.nodes}
     for _ in f.nodes:
-        for a, b in f.edges:
-            rank[b] = max(rank[b], rank[a] + 1)
+        for e in f.edges:
+            rank[e[1]] = max(rank[e[1]], rank[e[0]] + 1)
     return rank
 
 
@@ -166,25 +174,48 @@ def _size(label: str) -> tuple[int, int]:
     return max(112, int(max(len(t) for t in lines) * 7.6) + 30), 24 + 19 * len(lines)
 
 
+def _layout(f: Flow, size: dict[str, tuple[int, int]], gap_x: int, gap_y: int, pad: int, top: int):
+    """Positions as {id: (x, y, w, h)}, the canvas width, and the y of the bottom of the lowest node."""
+    if f.grid is None:
+        rank = _ranks(f)
+        columns: dict[int, list[str]] = {}
+        for i, _, _ in f.nodes:
+            columns.setdefault(rank[i], []).append(i)
+        col_w = {r: max(size[i][0] for i in ids) for r, ids in columns.items()}
+        col_h = {r: sum(size[i][1] for i in ids) + gap_y * (len(ids) - 1) for r, ids in columns.items()}
+        height = max(col_h.values())
+        pos, x = {}, pad
+        for r in sorted(columns):
+            y = top + (height - col_h[r]) / 2
+            for i in columns[r]:
+                w, h = size[i]
+                pos[i] = (x + (col_w[r] - w) / 2, y, w, h)
+                y += h + gap_y
+            x += col_w[r] + gap_x
+        return pos, x - gap_x + pad, top + height
+    n_cols = max(c for c, _ in f.grid.values()) + 1
+    n_rows = max(r for _, r in f.grid.values()) + 1
+    col_w = [max([size[i][0] for i, (c, _) in f.grid.items() if c == k] or [0]) for k in range(n_cols)]
+    row_h = [max([size[i][1] for i, (_, r) in f.grid.items() if r == k] or [0]) for k in range(n_rows)]
+    xs = [pad + sum(col_w[:k]) + gap_x * k for k in range(n_cols)]
+    ys = [top + sum(row_h[:k]) + gap_y * k for k in range(n_rows)]
+    pos = {}
+    for i, (c, r) in f.grid.items():
+        w, h = size[i]
+        pos[i] = (xs[c] + (col_w[c] - w) / 2, ys[r] + (row_h[r] - h) / 2, w, h)
+    return pos, xs[-1] + col_w[-1] + pad, ys[-1] + row_h[-1]
+
+
 def render_svg(f: Flow) -> str:
-    rank = _ranks(f)
     size = {i: _size(t) for i, t, _ in f.nodes}
-    columns: dict[int, list[str]] = {}
-    for i, _, _ in f.nodes:
-        columns.setdefault(rank[i], []).append(i)
-    gap_x, gap_y, pad = 44, 26, 18
-    col_w = {r: max(size[i][0] for i in ids) for r, ids in columns.items()}
-    col_h = {r: sum(size[i][1] for i in ids) + gap_y * (len(ids) - 1) for r, ids in columns.items()}
-    height = max(col_h.values()) + 2 * pad
-    pos, x = {}, pad
-    for r in sorted(columns):
-        y = (height - col_h[r]) / 2
-        for i in columns[r]:
-            w, h = size[i]
-            pos[i] = (x + (col_w[r] - w) / 2, y, w, h)
-            y += h + gap_y
-        x += col_w[r] + gap_x
-    width = x - gap_x + pad
+    routed = [e for e in f.edges if len(e) > 2]
+    pad = 18
+    top = pad + (26 if any(e[2] == "above" for e in routed) else 0)
+    gap_y = 56 if routed and f.grid else 26
+    pos, width, bottom = _layout(f, size, 44, gap_y, pad, top)
+    below = 26 if any(e[2] == "below" for e in routed) else 0
+    note = 24 if f.caption else 0
+    height = bottom + below + note + pad
 
     out = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}" style="max-width:100%;height:auto" font-family="{FONT}">',
@@ -192,12 +223,30 @@ def render_svg(f: Flow) -> str:
         f'<marker id="ahd" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{DIM_EDGE}"/></marker></defs>',
         f'<rect width="{width}" height="{height}" rx="10" fill="#ffffff"/>',
     ]
-    for a, b in f.edges:
+    for e in f.edges:
+        a, b = e[0], e[1]
+        route = e[2] if len(e) > 2 else None
         ax, ay, aw, ah = pos[a]
         bx, by, bw, bh = pos[b]
         dim = f.state(b) == "dim"
+        acx, bcx = ax + aw / 2, bx + bw / 2
+        if route == "below":
+            yr = max(ay + ah, by + bh) + 18
+            shape = f'<polyline points="{acx},{ay + ah} {acx},{yr} {bcx},{yr} {bcx},{by + bh + 2}" fill="none"'
+        elif route == "above":
+            yr = min(ay, by) - 18
+            shape = f'<polyline points="{acx},{ay} {acx},{yr} {bcx},{yr} {bcx},{by - 2}" fill="none"'
+        elif route == "elbow":
+            ym = (ay + ah + by) / 2
+            shape = f'<polyline points="{acx},{ay + ah} {acx},{ym} {bcx},{ym} {bcx},{by - 2}" fill="none"'
+        elif f.grid is None or abs((ay + ah / 2) - (by + bh / 2)) < 1:
+            shape = f'<line x1="{ax + aw}" y1="{ay + ah / 2}" x2="{bx - 2}" y2="{by + bh / 2}"'
+        elif by > ay:
+            shape = f'<line x1="{acx}" y1="{ay + ah}" x2="{bcx}" y2="{by - 2}"'
+        else:
+            shape = f'<line x1="{acx}" y1="{ay}" x2="{bcx}" y2="{by + bh + 2}"'
         out.append(
-            f'<line x1="{ax + aw}" y1="{ay + ah / 2}" x2="{bx - 2}" y2="{by + bh / 2}" stroke="{DIM_EDGE if dim else EDGE}" stroke-width="1.8"'
+            f'{shape} stroke="{DIM_EDGE if dim else EDGE}" stroke-width="1.8"'
             f'{DASH if dim else ""} marker-end="url(#{"ahd" if dim else "ah"})"/>'
         )
     for i, label, state in f.nodes:
@@ -212,6 +261,8 @@ def render_svg(f: Flow) -> str:
             f'{DASH if state == "dim" else ""}/>'
             f'<text text-anchor="middle" font-size="14" fill="{color}" font-weight="{600 if state == "hot" else 500}">{tspans}</text>'
         )
+    if f.caption:
+        out.append(f'<text x="{pad}" y="{height - pad + 2}" font-size="12" fill="{DIM_TEXT}">{escape(f.caption)}</text>')
     out.append("</svg>")
     return "".join(out)
 
@@ -232,9 +283,9 @@ def to_dot(f: Flow) -> str:
         }.get(state, "")
         text = label.replace("\n", "\\n")
         lines.append(f'  {i} [label="{text}"{extra}];')
-    for a, b in f.edges:
-        style = f' [style=dashed color="{DIM_EDGE}"]' if f.state(b) == "dim" else ""
-        lines.append(f"  {a} -> {b}{style};")
+    for e in f.edges:
+        style = f' [style=dashed color="{DIM_EDGE}"]' if f.state(e[1]) == "dim" else ""
+        lines.append(f"  {e[0]} -> {e[1]}{style};")
     lines.append("}")
     return "\n".join(lines)
 
