@@ -1,8 +1,6 @@
 """Helpers that draw tables and views from the notebooks' own data.
 
-build_notebooks.py puts the source of these functions into a hidden helper cell of notebook 01, so the
-notebook runs without importing this module (the Colab setup clones a repository that does not contain it).
-Each function therefore uses only `escape`, `HTML` and `display`, which the helper cell imports.
+workshop.py imports these functions, so notebook 01 calls them as w.show_claim_check and w.show_prompt.
 
     claim_check_html(rows)   a table of what the model said against what the data says
     show_claim_check(rows)   the same, displayed

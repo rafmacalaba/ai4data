@@ -25,9 +25,9 @@ HERE = Path(__file__).resolve().parent
 SETUP = '''# Setup. In Colab this clones the repository and installs the dependencies; locally it uses the folder as is.
 import os, sys, subprocess, pathlib
 
-REPO_URL = "https://github.com/avsolatorio/ai4data.git"   # replace with the published repository when released
-BRANCH = "feat/training-series"
-SESSION = "training/session-01-building-ai-applications/notebooks"
+REPO_URL = "https://github.com/rafmacalaba/ai4data.git"   # replace with the published repository when released
+BRANCH = "feat/training-session-01-v2"
+SESSION = "training/session-01-building-ai-applications-v2/notebooks"
 
 if not pathlib.Path("workshop.py").exists():
     subprocess.run(["git", "clone", "-q", "--depth", "1", "--branch", BRANCH, REPO_URL, "/content/ai4data"], check=True)
@@ -91,17 +91,6 @@ def explainer_md(name: str) -> str:
     return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
 
 
-def helpers_source() -> str:
-    """The hidden helper cell of notebook 01: the functions of visuals.py, with their imports, as a Colab form."""
-    import inspect
-
-    import visuals
-
-    functions = "\n\n".join(inspect.getsource(f).rstrip() for f in (visuals.claim_check_html, visuals.show_claim_check, visuals.prompt_html, visuals.show_prompt))
-    return ('#@title Helpers that draw the table and the prompt below { display-mode: "form" }\n'
-            "from html import escape\nfrom IPython.display import HTML, display\n\n\n" + functions)
-
-
 def md(text: str):
     text = re.sub(r"@@DIAGRAM:(\w+)@@", lambda m: diagram_md(m.group(1)), text)
     text = re.sub(r"@@EXPLAINER:(\w+)@@", lambda m: explainer_md(m.group(1)), text)
@@ -130,7 +119,7 @@ rows = [  # (claim, what the model said, what the data says, verdict)
     ("Rwanda · GDP per capita", "“close to 1,000 US dollars”", f"{value('NY.GDP.PCAP.CD', 'Rwanda'):,.0f} US dollars", "close"),
     ("Rwanda · growth", "“frequently above 7 percent”", f"above 7 percent in {sum(g > 7 for g in growth('Rwanda'))} of {len(growth('Rwanda'))} years, 2015 to 2024", "close"),
 ]
-show_claim_check(rows)
+w.show_claim_check(rows)
 '''
 
 # =============================================================================
@@ -173,7 +162,6 @@ Run the cells in order. Without an API key the model outputs are recorded ones, 
 The next cell installs the session's tools and loads its helper module. It takes about a minute the first time, and you do not need to read it.
 """),
     code(SETUP),
-    code(helpers_source()),
     md(STACK),
     md("""
 ## 1. A prompt with three parts
@@ -287,7 +275,7 @@ The messages the prompt produced for the last call, with each part in the colour
 """),
     code('''
 messages = prompt.format_messages(instructions=INSTRUCTIONS_CLARIFY, context=docs["kenya-digital"].page_content, question="How connected is Kenya?")
-show_prompt(messages)
+w.show_prompt(messages)
 '''),
     md("""
 ## 7. What context costs
