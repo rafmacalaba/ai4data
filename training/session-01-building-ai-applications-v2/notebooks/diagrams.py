@@ -40,7 +40,7 @@ DASH = ' stroke-dasharray="5 4"'
 
 ALT = {
     "prompt": "Diagram: the question and the context feed the prompt, which goes to the model and produces the answer.",
-    "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, added in notebook 03: the question and the retrieved context from the vector store feed the prompt, then the model and the answer.",
+    "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, built in notebook 03: the question and the retrieved context from the vector store feed the prompt, then the model and the answer.",
     "retrieval": "Diagram: the question goes to a retriever, which returns top-k passages; the passages and the question go into the prompt, then the model and an answer with citations.",
     "tools": "Diagram: the question goes to the model, which calls the tool get_indicator with an indicator, a country and optional start and end years, and receives data that returns to the model, which answers with text or an object that matches a schema. Separately, the same tool is served over MCP to any MCP client, such as this notebook, a chatbot or a desktop assistant.",
     "agent": "Diagram: the question goes to the model, which calls search_documents with a query, getting passages, or get_indicator with an indicator, a country and optional start and end years, getting data; the results return to the model, which answers. The tools run in a fixed order in a chain, or are chosen by the model, with a recursion limit and a trace.",
@@ -88,7 +88,7 @@ def flow(name: str, stage: int | None = None) -> Flow:
             ],
             [("d", "md"), ("md", "ch"), ("ch", "e"), ("e", "v"), ("v", "p", "elbow"), ("q", "p"), ("p", "m"), ("m", "a")],
             grid={"d": (0, 0), "md": (1, 0), "ch": (2, 0), "e": (3, 0), "v": (4, 0), "q": (0, 1), "p": (3, 1), "m": (4, 1), "a": (5, 1)},
-            caption="Dashed boxes: added in notebook 03",
+            caption="Solid: built in this notebook. Dashed: built in notebook 03",
         )
     if name == "retrieval":
         return Flow(
