@@ -40,7 +40,7 @@ from langchain_core.tools import tool
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from pcn_core import Claim, compare_by_policy
-from visuals import claim_check_html, prompt_html, show_claim_check, show_prompt  # noqa: F401  (the tables and views drawn in notebook 01)
+from visuals import claim_check_html, prompt_html, show_claim_check, show_prompt, show_table, table_html  # noqa: F401  (the tables and views drawn in notebook 01)
 from pydantic import BaseModel, Field
 
 # ----------------------------------------------------------------------------

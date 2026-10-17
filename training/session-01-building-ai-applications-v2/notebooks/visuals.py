@@ -2,6 +2,7 @@
 
 workshop.py imports these functions, so notebook 01 calls them as w.show_claim_check and w.show_prompt.
 
+    table_html(headers, rows)  a small table, drawn as a light card
     claim_check_html(rows)   a table of what the model said against what the data says
     show_claim_check(rows)   the same, displayed
     prompt_html(messages)    the messages of one call, colour-coded: instructions, context, question
@@ -41,6 +42,31 @@ def claim_check_html(rows, source="none"):
         f'<thead><tr style="text-align:left;background:#f3f4f6">{head}</tr></thead><tbody>{body}</tbody></table>'
         f'<p style="font:600 14px Helvetica,Arial,sans-serif;margin:10px 2px 2px;color:#16315a">{escape(summary)}</p></div>'
     )
+
+
+def table_html(headers, rows, source=""):
+    """A small table in a light card. Cells that look like numbers are right-aligned."""
+    import re
+
+    cell = "padding:7px 12px;border-bottom:1px solid #e5e9f0;vertical-align:top"
+
+    def align(text):
+        return "right" if re.fullmatch(r"[0-9,.-]+", str(text)) else "left"
+
+    head = "".join(f'<th style="padding:7px 12px;text-align:{"right" if i >= 2 else "left"}">{escape(str(h))}</th>' for i, h in enumerate(headers))
+    body = "".join(
+        "<tr>" + "".join(f'<td style="{cell};text-align:{align(c)}">{escape(str(c))}</td>' for c in row) + "</tr>"
+        for row in rows
+    )
+    note = f'<p style="font:12.5px Helvetica,Arial,sans-serif;margin:8px 2px 2px;color:#6b7280">{escape(source)}</p>' if source else ""
+    return (
+        f'<div style="{CARD};display:inline-block"><table style="border-collapse:collapse;font:14px Helvetica,Arial,sans-serif;color:#16315a">'
+        f'<thead><tr style="background:#f3f4f6">{head}</tr></thead><tbody>{body}</tbody></table>{note}</div>'
+    )
+
+
+def show_table(headers, rows, source=""):
+    display(HTML(table_html(headers, rows, source)))
 
 
 def show_claim_check(rows, source="none"):

@@ -215,10 +215,14 @@ The model was given no data, so it answered from what it learned in training. To
 2. The second cell takes six claims from the model's answer and sets each one beside the matching official figure.
 """),
     code('''
+rows = []
 for ind in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"]:
+    fmt = "{:,.0f}" if ind == "NY.GDP.PCAP.CD" else "{:.1f}"
     for country in ["Kenya", "Rwanda"]:
         r = w.indicator_lookup(ind, country, start=2023)
-        print(f"{r['name']:50s} {country:7s}", [(o["year"], round(o["value"], 1)) for o in r["observations"]])
+        by_year = {o["year"]: fmt.format(o["value"]) for o in r["observations"]}
+        rows.append((r["name"], country, by_year[2023], by_year[2024]))
+w.show_table(["Indicator", "Country", "2023", "2024"], rows, source="Source: World Bank, World Development Indicators.")
 '''),
     code(CLAIMS_CELL),
     md("""
