@@ -456,7 +456,12 @@ Sections about internet use score highest for a question about internet use, the
 
 ## 5. What poor preparation does
 
-The same collection prepared badly: the metadata dropped, every document joined into one text, and fixed windows. Search both versions with the same question and compare the top results.
+Two versions of the same collection, searched with the same question.
+
+- **Prepared badly:** the metadata dropped, every document joined into one long text, and cut into fixed windows.
+- **Prepared well:** what sections 1 to 4 built, with metadata and one chunk per section.
+
+The question needs two figures, Kenya's latest and Rwanda's latest. The cell shows the top three pieces each search returns, and marks which of the two figures turn up in them.
 """),
     code('''
 from langchain_core.documents import Document
@@ -466,14 +471,39 @@ poor = w.build_store(w.split_fixed([blob], chunk_size=400, chunk_overlap=50), em
 good = w.build_store(chunks, embeddings)
 
 q = "What are the latest available figures for internet use in Kenya and Rwanda?"
-print("Poorly prepared (one blob, fixed windows, no metadata):")
-for d, s in poor.similarity_search_with_score(q, k=3):
-    print(f"  {s:6.3f}  {d.page_content[:90]!r}")
-print("\\nPrepared (sections with metadata):")
-w.print_hits(good.similarity_search_with_score(q, k=3))
+expected = next(item for item in w.load_questions() if item["id"] == "q8")["expected_numbers"]
+countries = {"KEN": "Kenya", "RWA": "Rwanda"}
+checks = [f"{countries[e['country']]}, {e['year']}: {e['value']}" for e in expected]
+
+
+def search(store, title, tone):
+    hits = store.similarity_search(q, k=3)
+    text = " ".join(h.page_content for h in hits)
+    return {"title": title, "tone": tone, "hits": [(w.citation(h), h.page_content) for h in hits],
+            "found": [w.numbers_present(text, [e])[0] == 1 for e in expected]}
+
+
+w.show_search_comparison(q, [search(poor, "Prepared badly", "bad"), search(good, "Prepared well", "good")], checks)
+'''),
+    code('''
+def numbers_found(store):
+    found = total = 0
+    for item in w.load_questions():
+        text = " ".join(h.page_content for h in store.similarity_search(item["question"], k=3))
+        for e in item.get("expected_numbers", []):
+            found += w.numbers_present(text, [e])[0]
+            total += 1
+    return found, total
+
+
+for name, store in (("Prepared badly", poor), ("Prepared well", good)):
+    found, total = numbers_found(store)
+    print(f"{name}: {found} of {total} needed numbers appear in the top 3 pieces, across the eight evaluation questions")
 '''),
     md("""
-In the poorly prepared index the top results are fragments that cannot be cited and carry no date. In the prepared index each hit names its document, section, and year, so the application can filter and the reader can check. The 2016 summary ranks first in the prepared index too, because a search matches meaning, not age. Its date is what the next notebook uses to deal with it.
+Prepared badly, the search does not find Kenya's latest figure. Its top three pieces are the 2016 summary, Rwanda's internet paragraph, and a window that starts in the last section of Rwanda's brief and runs on into the title of the next document. Every piece is labelled `blob`, so a reader cannot tell where any of it came from or how old it is. Prepared well, the same question finds both figures, and each piece names its document, section, and year. The 2016 summary comes first in both, because a search matches meaning, not age; its date is what the next notebook uses to deal with it.
+
+The second cell counts the same thing across all eight evaluation questions. The gap is smaller there, because for several questions both versions find what they need.
 
 ## 6. Build the vector store for the next notebook
 
@@ -489,7 +519,7 @@ print(len(store.store), "chunks in the vector store")
 - Metadata is information about a document that its text does not say: date, type, country, source. The 2016 summary sounds current; its date, kept as metadata, is how an application can tell that it is old. An application can use the date only if it kept it.
 - Chunk boundaries decide what retrieval can return. Fixed windows cut by length and can separate a heading from its paragraph; section chunks keep the heading with its meaning.
 - Embeddings place text by meaning, so a question lands near the chunks that answer it. They know nothing about dates.
-- A collection prepared badly returns fragments that cannot be cited or dated. Prepared well, each hit names its document, section, and year.
+- A collection prepared badly returns pieces that cannot be cited or dated, and can miss the figures a question needs. Prepared well, each hit names its document, section, and year, and the figures turn up.
 - Preparation decides what retrieval can find. The next notebook uses the collection to answer questions, and shows where it still goes wrong.
 
 ## Exercise

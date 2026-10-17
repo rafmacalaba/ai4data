@@ -5,6 +5,7 @@ workshop.py imports these functions, so notebook 01 calls them as w.show_claim_c
     table_html(headers, rows)  a small table, drawn as a light card
     claim_check_html(rows)   a table of what the model said against what the data says
     show_claim_check(rows)   the same, displayed
+    search_comparison_html(question, columns, checks)  one search on two versions of a collection, side by side
     prompt_html(messages)    the messages of one call, colour-coded: instructions, context, question
     show_prompt(messages)    the same, displayed
 """
@@ -71,6 +72,49 @@ def show_table(headers, rows, source=""):
 
 def show_claim_check(rows, source="none"):
     display(HTML(claim_check_html(rows, source)))
+
+
+def search_comparison_html(question, columns, checks):
+    """Side-by-side results of one search on two versions of a collection.
+
+    Each column is a dict: title, tone ("bad" or "good"), hits [(citation, text), ...], and found [one bool
+    per check]. `checks` names the figures the question needs.
+    """
+    colours = {"bad": "#9a3a2f", "good": "#2f8f5b"}
+
+    def excerpt(text):
+        flat = " ".join(text.split())
+        if len(flat) <= 170:
+            return flat
+        return flat[:100].rsplit(" ", 1)[0] + " … " + flat[-60:].split(" ", 1)[1]
+
+    blocks = ""
+    for column in columns:
+        colour = colours.get(column.get("tone"), "#2f5f9e")
+        hits = "".join(
+            f'<div style="margin:8px 0;padding:8px 10px;background:#f6f7f9;border-radius:8px">'
+            f'<div style="font:700 12.5px Menlo,Consolas,monospace;color:{colour}">{escape(label)}</div>'
+            f'<div style="font:12.5px Helvetica,Arial,sans-serif;color:#374151;margin-top:3px">{escape(excerpt(text))}</div></div>'
+            for label, text in column["hits"]
+        )
+        ticks = "".join(
+            f'<div style="font:600 13px Helvetica,Arial,sans-serif;color:{"#1f6b43" if ok else "#8e2b21"}">'
+            f'{"✓ found" if ok else "✗ missing"} {escape(check)}</div>'
+            for check, ok in zip(checks, column["found"])
+        )
+        blocks += (
+            f'<div style="flex:1;min-width:300px;border:1.5px solid {colour};border-radius:10px;padding:10px 12px">'
+            f'<div style="font:700 14px Helvetica,Arial,sans-serif;color:{colour}">{escape(column["title"])}</div>{hits}'
+            f'<div style="margin-top:8px">{ticks}</div></div>'
+        )
+    return (
+        f'<div style="{CARD}"><div style="font:600 13.5px Helvetica,Arial,sans-serif;margin-bottom:10px">Question: {escape(question)}</div>'
+        f'<div style="display:flex;gap:14px;flex-wrap:wrap">{blocks}</div></div>'
+    )
+
+
+def show_search_comparison(question, columns, checks):
+    display(HTML(search_comparison_html(question, columns, checks)))
 
 
 def prompt_html(messages):
