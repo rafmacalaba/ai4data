@@ -394,11 +394,68 @@ def desk_svg():
     return "".join(p)
 
 
+# --------------------------------------------------------------- notebook 02: metadata and text
+def metadata_svg():
+    meta = frontmatter.load(DOC.parent / "regional-2016.md")
+    body = [p.strip() for p in meta.content.split("\n\n") if p.strip()]
+    heading, paragraphs = body[0].lstrip("# ").strip(), body[1:]
+    fields = [(k, str(meta.metadata[k])) for k in ("id", "title", "type", "country", "date", "source")]
+    W, pad, top = 1000, 24, 62
+    ORANGE = "#d9822b"
+
+    # left card: the metadata
+    left, y, date_box = [], top + 50, None
+    for key, value in fields:
+        lines = wrap_lines(value, 34)
+        h = 17 * len(lines)
+        if key == "date":
+            date_box = (y - 15, h + 8)
+            left.append(f'<rect x="{pad + 10}" y="{y - 15}" width="{360 - 20}" height="{h + 8}" rx="6" fill="{ORANGE}" fill-opacity="0.18" stroke="{ORANGE}" stroke-width="1.5"/>')
+        left.append(f'<text x="{pad + 22}" y="{y}" font-size="12.5" font-weight="700" fill="{GREY}">{key}</text>')
+        left.append(text_block(pad + 92, y, lines, size=12.5, fill=INK, lh=17, weight="700" if key == "date" else "400"))
+        y += h + 12
+    left_bottom = y
+
+    # right card: the text
+    right, y2, last_box = [], top + 50, None
+    right.append(f'<text x="{pad + 400 + 18}" y="{y2}" font-size="13" font-weight="700" fill="{INK}">{escape(heading)}</text>')
+    y2 += 26
+    for i, para in enumerate(paragraphs):
+        lines = wrap_lines(para, 80)
+        h = 17 * len(lines)
+        if i == len(paragraphs) - 1:
+            right.append(f'<rect x="{pad + 400 + 10}" y="{y2 - 15}" width="{W - 2 * pad - 400 - 20}" height="{h + 8}" rx="6" fill="{ORANGE}" fill-opacity="0.18" stroke="{ORANGE}" stroke-width="1.5"/>')
+        right.append(text_block(pad + 400 + 18, y2, lines, size=12.5, fill=INK, lh=17))
+        y2 += h + 12
+    bottom = max(left_bottom, y2) + 6
+    card_h = bottom - top
+    H = int(bottom + 86)
+    p = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
+        f'<text x="{pad}" y="34" font-size="17" font-weight="700" fill="{INK}">One document, two parts</text>',
+        f'<rect x="{pad}" y="{top}" width="360" height="{card_h}" rx="10" fill="{INSTR}" fill-opacity="0.07" stroke="{INSTR}" stroke-width="1.8"/>',
+        f'<text x="{pad + 14}" y="{top + 24}" font-size="14" font-weight="700" fill="{INSTR}">Metadata</text>',
+        f'<text x="{pad + 346}" y="{top + 24}" text-anchor="end" font-size="11.5" fill="{GREY}">the header of the file</text>',
+        f'<rect x="{pad + 400}" y="{top}" width="{W - 2 * pad - 400}" height="{card_h}" rx="10" fill="{CTX}" fill-opacity="0.07" stroke="{CTX}" stroke-width="1.8"/>',
+        f'<text x="{pad + 414}" y="{top + 24}" font-size="14" font-weight="700" fill="{CTX}">Text</text>',
+        f'<text x="{W - pad - 14}" y="{top + 24}" text-anchor="end" font-size="11.5" fill="{GREY}">the body of the file</text>',
+    ] + left + right + [
+        f'<text x="{pad}" y="{bottom + 28}" font-size="13.5" font-weight="700" fill="#b86a14">An application can filter and rank on this field.</text>',
+        f'<text x="{pad + 400}" y="{bottom + 28}" font-size="13.5" font-weight="700" fill="#b86a14">In the text, "latest" reads as current.</text>',
+        f'<text x="{pad}" y="{bottom + 62}" font-size="14.5" font-weight="700" fill="{BLUE}">An application can use the date only if it was kept as metadata.</text>',
+        "</svg>",
+    ]
+    return "".join(p)
+
+
+
 ALT = {
     "chunking": "Animation: the same Kenya brief cut two ways. Fixed 400-character windows end on a stranded heading and mix two sections; section chunks keep each heading with its paragraph.",
     "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
     "prompt": "Animation: instructions set by the developer, context supplied by the application and a question asked by the user are combined into one prompt, which goes to the model and produces an answer that cites its source.",
     "before_after": "Diagram: the same question without context gets an answer with no source, no date and a blend of two measures; with the four country briefs as context it gets a dated answer that cites its source.",
+    "metadata": "Diagram: one document in two parts. Its metadata, the header of the file, holds the date 2016-06-01; its text sounds current and ends 'The latest available figures are for 2015.' An application can filter and rank on the date field, but it does not read the text for age.",
     "desk": "Diagram: the four briefs of this notebook, about 1,024 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 

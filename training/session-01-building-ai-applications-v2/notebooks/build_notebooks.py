@@ -87,6 +87,7 @@ def explainer_md(name: str) -> str:
         "prompt": explainers.prompt_svg,
         "before_after": explainers.before_after_svg,
         "desk": explainers.desk_svg,
+        "metadata": explainers.metadata_svg,
     }[name]()
     return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
 
@@ -331,11 +332,11 @@ NB02 = [
     md("""
 # 02 · Preparing knowledge for an application
 
-**Session 01 · notebook 2 of 6**
+**Session 01 · Building AI applications for research and data · notebook 2 of 6**
 
 ## Objective
 
-Turn a collection of documents into something an application can search: documents with metadata, split into chunks that keep their meaning, represented as vectors in a vector store. See how the choices made here decide what retrieval can find later.
+Notebook 01 ended with a problem: an application cannot hand the model every document it has, so it has to select what to supply. Selecting needs a collection that has been prepared: documents together with information about them, cut into pieces that keep their meaning, and placed where a search can find them by meaning. This notebook builds that collection, and shows how the choices made here decide what retrieval can find later.
 
 ## The application after this notebook
 
@@ -343,13 +344,32 @@ Turn a collection of documents into something an application can search: documen
 
 It shows the pipeline this notebook builds, and where notebook 03 picks it up.
 
-The tools are LangChain's: `Document`, `MarkdownHeaderTextSplitter`, `RecursiveCharacterTextSplitter`, `HuggingFaceEmbeddings`, and `InMemoryVectorStore`.
+## What you will see
+
+Four short scenes:
+
+1. The collection: eight documents, each with its text and information about it. One of them is ten years older than the rest, and its metadata records that.
+2. The same brief cut two ways, by length and by heading.
+3. Text turned into numbers that place it on a map of meaning.
+4. The same collection prepared badly and prepared well, searched with the same question.
+
+## How to run it
+
+Run the cells in order. Nothing in this notebook calls the model, so no recorded outputs appear here. The embedding model downloads about 90 MB the first time it is used.
+"""),
+    md("""
+The next cell installs the session's tools and loads its helper module. It takes about a minute the first time, and you do not need to read it.
 """),
     code(SETUP),
     md("""
+The tools in this notebook are LangChain's: `Document`, `MarkdownHeaderTextSplitter`, `RecursiveCharacterTextSplitter`, `HuggingFaceEmbeddings`, and `InMemoryVectorStore`.
+"""),
+    md("""
 ## 1. The collection
 
-Eight short documents, each loaded as a LangChain `Document` whose metadata comes from the file's YAML header: id, title, type, country, date, source. Four are relevant briefs, one is a definition note, one is an outdated summary, and two are distractors. See `assets/README.md` for what each is for.
+The collection is eight short documents. Each file has two parts: a header with information about the document (its id, title, type, country, date, and source), and the text itself. LangChain loads each file as a `Document`: the text is the `page_content`, and the header becomes the `metadata`.
+
+Four are the country briefs the worked example needs, one defines the internet indicator, one is a regional summary from 2016, and two, on coffee and on mobile money, are about other topics and are there to distract. See `assets/README.md` for what each is for.
 """),
     code('''
 docs = w.load_documents()
@@ -359,16 +379,22 @@ for d in docs:
     print(f"{m['id']:20s} {m['type']:16s} {str(m['date']):12s} {m['title']}")
 '''),
     md("""
-## 2. Metadata is part of the knowledge
+## 2. Metadata: what the text cannot say about itself
 
-The outdated summary is the clearest case. Its text reads as current ("the latest available figures are for 2015") and its figures were correct when it was written. The only thing that tells an application to rank it below the 2026 briefs is its date, which lives in the metadata.
+Metadata is information about a document that is not in its text: when it was written, what kind of document it is, which country it covers, where its numbers come from.
+
+@@EXPLAINER:metadata@@
+
+The 2016 summary shows why that matters. Read on its own, its text sounds current: it ends with "The latest available figures are for 2015." Its figures were correct when it was written. A reader might notice the year in the title, but an application does not read for that: it can only filter or rank on the date, which is kept as metadata, and which says that the summary was written in 2016, ten years before the briefs.
+
+The date does nothing by itself: an application has to use it. Section 5 shows what is lost when the metadata is dropped, and notebook 03 uses the date to keep the 2016 summary out of an answer about the latest figures.
 """),
     code('''
 d = next(d for d in docs if d.metadata["id"] == "regional-2016")
 for k in ("date", "type", "note"):
     print(f"{k:6s}", d.metadata[k])
 print()
-print(d.page_content[:500])
+print(d.page_content)
 '''),
     md("""
 ## 3. Chunking: fixed windows against sections
@@ -399,7 +425,7 @@ The fixed window cuts by length, not by meaning. This one starts in the middle o
 
 ## 4. Embeddings
 
-An embedding is a vector that places a text so that texts with similar meaning are close. The session uses a small sentence-transformer model through LangChain's `HuggingFaceEmbeddings`; it downloads about 90 MB on first use. The cell embeds a few sections and a query and ranks the sections by similarity.
+An embedding turns a text into a list of numbers that places it on a map of meaning: texts with similar meaning land close together. The session uses a small embedding model through LangChain's `HuggingFaceEmbeddings`; it downloads about 90 MB on first use. The cell embeds a few sections and a question and ranks the sections by similarity.
 
 @@EXPLAINER:embeddings@@
 
@@ -419,11 +445,11 @@ for c, v in sorted(zip(sample, vectors), key=lambda cv: -float(cv[1] @ query)):
     print(f"{float(v @ query):6.3f}  {c.metadata['id']:16s} {c.metadata['section']}")
 '''),
     md("""
-Sections about internet use score highest for a query about internet use, the mobile-subscription sections next, and growth last. The ranking depends on what the chunk text contains, which is why the splitter choice in section 3 matters here.
+Sections about internet use score highest for a question about internet use, the mobile-subscription sections next, and growth last. The ranking depends on what the chunk text contains, which is why the splitter choice in section 3 matters here.
 
 ## 5. What poor preparation does
 
-The same collection with the headers stripped, every document concatenated into one text, and fixed windows. Search for the latest Kenya figures and compare the top results with the section index.
+The same collection prepared badly: the metadata dropped, every document joined into one text, and fixed windows. Search both versions with the same question and compare the top results.
 """),
     code('''
 from langchain_core.documents import Document
@@ -440,7 +466,7 @@ print("\\nPrepared (sections with metadata):")
 w.print_hits(good.similarity_search_with_score(q, k=3))
 '''),
     md("""
-In the poorly prepared index the top results are fragments that cannot be cited and carry no date. In the prepared index each hit names its document, section, and year, so the application can filter and the reader can check. The 2016 summary ranks high in the prepared index too; its date is what the next notebook uses to deal with it.
+In the poorly prepared index the top results are fragments that cannot be cited and carry no date. In the prepared index each hit names its document, section, and year, so the application can filter and the reader can check. The 2016 summary ranks first in the prepared index too, because a search matches meaning, not age. Its date is what the next notebook uses to deal with it.
 
 ## 6. Build the vector store for the next notebook
 
@@ -453,13 +479,16 @@ print(len(store.store), "chunks in the vector store")
     md("""
 ## Key points
 
-- Metadata (date, type, country, section) is part of what the application knows. It decides what can be filtered and ranked, and what a citation can say.
-- Chunk boundaries decide what retrieval can return. Sections keep meaning and headings; fixed windows cut through both.
-- Embeddings place text by meaning; the quality of the index is the quality of the text and metadata it was built from.
+- Metadata is information about a document that its text does not say: date, type, country, source. The 2016 summary sounds current; its date, kept as metadata, is how an application can tell that it is old. An application can use the date only if it kept it.
+- Chunk boundaries decide what retrieval can return. Fixed windows cut by length and can separate a heading from its paragraph; section chunks keep the heading with its meaning.
+- Embeddings place text by meaning, so a question lands near the chunks that answer it. They know nothing about dates.
+- A collection prepared badly returns fragments that cannot be cited or dated. Prepared well, each hit names its document, section, and year.
+- Preparation decides what retrieval can find. The next notebook uses the collection to answer questions, and shows where it still goes wrong.
 
 ## Exercise
 
-Write a ninth document, a short brief on Uganda with figures looked up from the World Development Indicators, with the same header fields. Add it to `assets/documents/`, rerun this notebook, and check where its sections rank for the queries above.
+1. Look at the table in section 1. If someone asked for the latest figures on internet use, which document would you be wary of, and which two are about something else? Say what in the table told you.
+2. In the cell of section 3, change `chunk_size=400` to `200` and run it again. How many fixed windows are there now, and where do they cut? Try `800`. The section chunks do not change, because they follow the headings.
 """),
     md(LINKS),
 ]
