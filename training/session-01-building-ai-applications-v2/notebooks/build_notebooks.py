@@ -293,7 +293,17 @@ w.show_prompt(messages)
     md("""
 ## 7. What context costs
 
-Four short briefs took about a thousand tokens. A real collection has thousands of documents and cannot be pasted into every call: the context window has a limit, cost grows with every token, and the relevant passages are a small part of the whole. The next two notebooks prepare a collection so that the application can select what to supply.
+Four short briefs took about a thousand tokens. A natural reaction at this point:
+
+> "So we can just give the AI all our documents as context!"
+
+It is the first idea most people have, and it does not work, for three reasons:
+
+- **It does not fit.** The context window, the amount of text a model can read in one call, has a limit. A real collection of thousands of documents is far larger.
+- **It costs more with every page.** Cost grows with every token, and the whole collection would be sent again with every question.
+- **The answer gets lost.** The passages that matter for one question are a small part of the whole, and the rest is noise around them.
+
+The next two notebooks prepare a collection so that the application can select what to supply.
 
 @@EXPLAINER:desk@@
 """),
