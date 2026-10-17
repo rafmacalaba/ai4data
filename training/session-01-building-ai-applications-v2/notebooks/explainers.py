@@ -380,7 +380,7 @@ def desk_svg():
     for i in range(4):
         p.append(f'<rect x="{64 + i * 34}" y="{118 + (i % 2) * 6}" width="26" height="36" rx="3" fill="#ffffff" stroke="{CTX}" stroke-width="1.6"/>')
     p.append(f'<text x="64" y="182" font-size="12.5" fill="{INK}">The four briefs used in this notebook:</text>'
-             f'<text x="64" y="200" font-size="12.5" font-weight="700" fill="{CTX}">about 1,019 tokens. They fit, with room to spare.</text>')
+             f'<text x="64" y="200" font-size="12.5" font-weight="700" fill="{CTX}">about 1,024 tokens. They fit, with room to spare.</text>')
     # collection
     p.append(f'<text x="560" y="94" font-size="13" font-weight="700" fill="#9a3a2f">A real collection: thousands of documents</text>')
     for r in range(5):
@@ -399,7 +399,7 @@ ALT = {
     "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
     "prompt": "Animation: instructions set by the developer, context supplied by the application and a question asked by the user are combined into one prompt, which goes to the model and produces an answer that cites its source.",
     "before_after": "Diagram: the same question without context gets an answer with no source, no date and a blend of two measures; with the four country briefs as context it gets a dated answer that cites its source.",
-    "desk": "Diagram: the four briefs of this notebook, about 1,019 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
+    "desk": "Diagram: the four briefs of this notebook, about 1,024 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 
 
