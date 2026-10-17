@@ -180,7 +180,7 @@ LangChain's `ChatPromptTemplate` keeps them as separate slots, and `prompt | mod
 
 @@EXPLAINER:prompt@@
 
-*The animation loops. The text in each box is taken from the cells below.*
+*The animation loops. Its text comes from this notebook: the instructions from the cell below, the context and the answer from section 3, and the question from the worked example. Section 6 shows the same three parts as the model received them.*
 """),
     code('''
 from langchain_core.prompts import ChatPromptTemplate
@@ -310,6 +310,8 @@ It is the first idea most people have, and it does not work, for three reasons:
 The next two notebooks prepare a collection so that the application can select what to supply.
 
 @@EXPLAINER:desk@@
+
+*The token count is the one printed in section 3.*
 """),
     md("""
 ## Key points
@@ -388,6 +390,8 @@ Metadata is information about a document that is not in its text: when it was wr
 
 @@EXPLAINER:metadata@@
 
+*The cell below prints this document: some of its metadata (the date, the type, and a note), then its full text.*
+
 The 2016 summary shows why that matters. Read on its own, its text sounds current: it ends with "The latest available figures are for 2015." Its figures were correct when it was written. A reader might notice the year in the title, but an application does not read for that: it can only filter or rank on the date, which is kept as metadata, and which says that the summary was written in 2016, ten years before the briefs.
 
 The date does nothing by itself: an application has to use it. Section 5 shows what is lost when the metadata is dropped, and notebook 03 uses the date to keep the 2016 summary out of an answer about the latest figures.
@@ -409,7 +413,7 @@ A chunk is the unit that retrieval returns and the model reads. Two LangChain sp
 
 @@EXPLAINER:chunking@@
 
-*The animation loops. It is drawn from the real brief and the two splitters, so the boundaries are the ones the cell below prints.*
+*The animation loops. It is drawn from the real brief and the two splitters. The cell below prints how many pieces each splitter made (4 windows and 4 sections) and shows two of them: window 2 of the fixed split, and the Mobile subscriptions section.*
 """),
     code('''
 kenya = [d for d in docs if d.metadata["id"] == "kenya-digital"]
@@ -424,7 +428,7 @@ print(sections[1].page_content)
 print("\\nmetadata:", sections[1].metadata["section"], "|", sections[1].metadata["date"], "|", sections[1].metadata["country"])
 '''),
     md("""
-The fixed window cuts by length, not by meaning. This one starts in the middle of the Internet use section, carries no heading of its own, and ends with the heading of the next section, separated from the paragraph it introduces. A passage about internet use is then stored next to a mobile-subscriptions heading, and nothing in the chunk says which section it belongs to. The section chunk carries its title and heading, which both the retriever and the model can use.
+Window 2 cuts by length, not by meaning. It starts in the middle of the Internet use section, carries no heading of its own, and ends with the heading of the next section, separated from the paragraph it introduces. A passage about internet use is then stored next to a mobile-subscriptions heading, and nothing in the chunk says which section it belongs to. The Mobile subscriptions section carries its title and heading, which both the retriever and the model can use.
 
 ## 4. Embeddings
 
@@ -432,7 +436,7 @@ An embedding turns a text into a list of numbers that places it on a map of mean
 
 @@EXPLAINER:embeddings@@
 
-*The animation loops. The similarity scores are the ones the cell below prints; the dot positions and the example numbers are illustrative.*
+*The animation loops. The six chunks and their similarity scores are the ones the cell below prints, for the question "share of people using the internet"; the dot positions and the example numbers are illustrative.*
 """),
     code('''
 import numpy as np
