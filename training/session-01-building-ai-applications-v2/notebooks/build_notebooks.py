@@ -461,7 +461,7 @@ Two versions of the same collection, searched with the same question.
 - **Prepared badly:** the metadata dropped, every document joined into one long text, and cut into fixed windows.
 - **Prepared well:** what sections 1 to 4 built, with metadata and one chunk per section.
 
-The question needs two figures, Kenya's latest and Rwanda's latest. The cell shows the top three pieces each search returns, and marks which of the two figures turn up in them.
+Each version is kept in a **vector store**: a place that holds the pieces together with their numbers, and can find the ones closest to a question. The question needs two figures, Kenya's latest and Rwanda's latest. The cell shows the top three pieces each search returns, and marks which of the two figures turn up in them.
 """),
     code('''
 from langchain_core.documents import Document
@@ -505,14 +505,21 @@ Prepared badly, the search does not find Kenya's latest figure. Its top three pi
 
 The second cell counts the same thing across all eight evaluation questions. The gap is smaller there, because for several questions both versions find what they need.
 
-## 6. Build the vector store for the next notebook
+## 6. What a vector store holds
 
-Notebook 03 rebuilds this store with one line. `InMemoryVectorStore` is enough for a workshop; the same code runs against a persistent store such as Chroma, FAISS, or pgvector by changing the class.
+For each chunk, a vector store holds three things: its text, its metadata, and its numbers. The cell opens one record of the prepared collection, the Mobile subscriptions section of the Kenya brief.
 """),
     code('''
-store = w.build_store(chunks, embeddings)
-print(len(store.store), "chunks in the vector store")
+store = good   # the prepared collection of section 5
+print(len(store.store), "chunks in the vector store. One of them:\\n")
+record = next(r for r in store.store.values() if r["metadata"]["id"] == "kenya-digital" and r["metadata"]["section"] == "Mobile subscriptions")
+print("text:    ", record["text"][:90].replace("\\n", " ") + " …")
+print("metadata:", {k: record["metadata"][k] for k in ("id", "section", "country", "date")})
+print("numbers: ", [round(x, 3) for x in record["vector"][:6]], "… (384 in all)")
 '''),
+    md("""
+This store lives in memory and disappears when the notebook closes, which is enough here. A real application keeps its store in a database, so that it lasts and can be shared with others. Notebook 03 builds the same store and searches it to answer questions.
+"""),
     md("""
 ## Key points
 
