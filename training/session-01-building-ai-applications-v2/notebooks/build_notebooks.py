@@ -166,7 +166,13 @@ The next cell installs the session's tools and loads its helper module. It takes
     md("""
 ## 1. A prompt with three parts
 
-Three parts go into every call: **instructions** (the system message), **context** (evidence supplied to the model), and the **question**. LangChain's `ChatPromptTemplate` keeps them as separate slots, and `prompt | model` is the whole application for now. Keeping the parts separate is the first design decision, because each is changed by a different person for a different reason.
+Three parts go into every call:
+
+- **Instructions**: the system message. It tells the model how to behave: its role, how to cite, what to do when information is missing.
+- **Context**: the evidence supplied to the model, such as the documents or data it should answer from.
+- **Question**: what the user asks.
+
+LangChain's `ChatPromptTemplate` keeps them as separate slots, and `prompt | model` is the whole application for now. Keeping the parts separate is the first design decision, because each is changed by a different person for a different reason.
 
 @@EXPLAINER:prompt@@
 
