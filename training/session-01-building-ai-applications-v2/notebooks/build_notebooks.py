@@ -149,7 +149,7 @@ The worked example for the whole session is one question:
 
 Four short scenes, each with a result you can read:
 
-1. The model answers from what it learned in training. The answer sounds right, and nothing in it can be checked.
+1. The model answers from what it learned in training. The answer sounds right, but it names no source, so a reader cannot check it.
 2. The same question with four country briefs supplied. The answer is specific and cites its sources.
 3. A question the briefs cannot answer, and what the model does about it.
 4. A question with two meanings, and what changes when the instructions tell the model to ask.
@@ -209,7 +209,7 @@ answer = chain.invoke({"instructions": INSTRUCTIONS_BASIC, "context": "(none)", 
 w.show(answer)
 '''),
     md("""
-The model was given no data, so it answered from what it learned in training. To judge that answer we need the official figures to check it against. They come from the World Bank's World Development Indicators. The model never saw them; we use them only afterwards, to check its answer.
+To judge that answer we need official figures to check it against. They come from the World Bank's World Development Indicators. The model never saw them; we use them only afterwards, to check its answer.
 
 1. The first cell prints the official figures for Kenya and Rwanda: the share of people using the internet, and GDP per capita.
 2. The second cell takes six claims from the model's answer and sets each one beside the matching official figure.
@@ -310,14 +310,16 @@ The next two notebooks prepare a collection so that the application can select w
     md("""
 ## Key points
 
-- An application separates instructions, context, and the question. Each is changed by a different person for a different reason.
-- Instructions shape behaviour: citations, what to do when information is missing, when to ask. They cannot supply data the model does not have.
-- Supplied context is what makes the answer specific and checkable. Selecting it is the job of the rest of the application.
+- A prompt has three parts: instructions, context, and the question. Each is set by someone different, so they are kept separate.
+- Without context, the model answers from training. Most figures were close, one blended two measures, and none named a source, so a reader could not tell which to trust.
+- With context, the answer is specific and cites its sources. The model did none of the finding; the application did, by putting the right text in front of it.
+- Instructions shape behaviour: cite sources, say so when information is missing, ask when a question has more than one meaning. They cannot supply data the model does not have.
+- Giving the model everything does not work: the context window has a limit, cost grows with every token, and the answer gets lost. The application has to select what to supply, which the next notebooks cover.
 
 ## Exercise
 
 1. Read the answers of sections 2 and 3 side by side. For each number, note whether you could check it and where. Then say which answer you would send to a colleague, and why.
-2. Change `INSTRUCTIONS_GROUNDED` so that the answer is a table with one row per country and columns for the indicator, the latest year, the value, and the source. Rerun section 3. With a live key the output changes; in recorded mode the cell returns the recorded answer, so note the expected result instead.
+2. In the cell of section 1, add a sentence to `INSTRUCTIONS_GROUNDED`, for example "Answer in no more than three sentences." Run that cell again, then run the cell of section 6. The Instructions block now shows your sentence, so you can see exactly what the model would receive. The recorded answers do not react to new instructions; with a live key in `WORKSHOP_API_KEY`, rerun section 3 to see how the answer changes.
 """),
     md(LINKS),
 ]
