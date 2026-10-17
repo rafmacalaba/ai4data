@@ -48,6 +48,9 @@ import workshop as w
 model = w.make_model()
 print("Model:", w.mode(model))'''
 
+# Notebook 02 never calls the model, so its setup cell does not create or announce one.
+SETUP_NO_MODEL = SETUP.split("# Optional: a key")[0] + 'import workshop as w\nprint("Ready.")'
+
 STACK = """## The stack
 
 | Need | Library |
@@ -360,7 +363,7 @@ Run the cells in order. This notebook only prepares material for the model that 
     md("""
 The next cell installs the session's tools and loads its helper module. It takes about a minute the first time, and you do not need to read it.
 """),
-    code(SETUP),
+    code(SETUP_NO_MODEL),
     md("""
 The tools in this notebook are LangChain's: `Document`, `MarkdownHeaderTextSplitter`, `RecursiveCharacterTextSplitter`, `HuggingFaceEmbeddings`, and `InMemoryVectorStore`.
 """),
