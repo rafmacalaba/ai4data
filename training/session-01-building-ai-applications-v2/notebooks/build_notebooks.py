@@ -358,7 +358,7 @@ Four short scenes:
 
 ## How to run it
 
-Run the cells in order. This notebook only prepares material for the model that writes the answers, so that model is not used until notebook 03, and no API key is needed. It does use a small embedding model, which turns text into numbers; it downloads about 90 MB the first time and runs inside the notebook.
+Run the cells in order. This notebook only prepares material for the model that writes the answers, so it does not use that model, and no API key is needed. The model comes back in notebook 03. Everything below is computed when you run the cell. It does use a small embedding model, which turns text into numbers; it downloads about 90 MB the first time and runs inside the notebook.
 """),
     md("""
 The next cell installs the session's tools and loads its helper module. It takes about a minute the first time, and you do not need to read it.
