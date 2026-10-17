@@ -113,7 +113,7 @@ def chunking_svg():
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
-        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
         f'<text x="{x0}" y="34" font-size="17" font-weight="700" fill="{INK}">Chunking: the same brief, cut two ways</text>',
         f'<text x="{x0}" y="54" font-size="12.5" fill="{GREY}">kenya-digital.md, 1,301 characters. The chunk boundaries below come from the splitters the notebook uses.</text>',
     ]
@@ -172,7 +172,7 @@ def embeddings_svg():
     p = [
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
         f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
-        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">Embeddings: from text to a position on a map of meaning</text>',
     ]
     # phase 1: the chunk card
@@ -286,7 +286,7 @@ def prompt_svg():
     W, H, T = 1000, 430, 17.0
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
          f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
-         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
          f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">What goes into one call to a language model</text>']
     parts = [
         ("Instructions", "set by the developer", INSTR, wrap_lines("You are a research assistant for development data. Answer only from the supplied context. Cite the document id…", 44)),
@@ -341,7 +341,7 @@ def before_after_svg():
     W, H = 1000, 330
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
          f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
-         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
          f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">The same question, without and with context</text>',
          f'<line x1="500" y1="56" x2="500" y2="{H - 20}" stroke="#d5dbe5" stroke-width="1.5"/>']
     def panel(x0, title, color, inputs, answer_lines, tags):
@@ -372,7 +372,7 @@ def before_after_svg():
 def desk_svg():
     W, H = 1000, 300
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
-         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
          f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">Why the application has to choose what the model reads</text>']
     # desk
     p.append(f'<rect x="40" y="70" width="420" height="150" rx="12" fill="{LIGHT}" stroke="{BLUE}" stroke-width="2"/>'

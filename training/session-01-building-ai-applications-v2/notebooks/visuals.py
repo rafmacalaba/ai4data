@@ -13,6 +13,9 @@ from html import escape
 from IPython.display import HTML, display
 
 
+CARD = "background:#ffffff;color:#16315a;border:1px solid #e1e6ee;border-radius:10px;padding:10px 14px"  # a light card, whatever the theme
+
+
 def claim_check_html(rows, source="none"):
     """Each row is (claim, what the model said, what the data says, verdict). Verdict "close" is green."""
     colours = {"close": ("#dff3e7", "#1f6b43"), "none": ("#fbe0dd", "#8e2b21")}
@@ -33,9 +36,10 @@ def claim_check_html(rows, source="none"):
         summary += " The others are marked above. None names a source, so a reader cannot tell which is which."
     head = "".join(f'<th style="padding:8px 10px">{h}</th>' for h in ["Claim", "What the model said", "What the data says", "Verdict", "Source named"])
     return (
-        f'<table style="border-collapse:collapse;font:14px Helvetica,Arial,sans-serif;width:100%">'
+        f'<div style="{CARD}">'
+        f'<table style="border-collapse:collapse;font:14px Helvetica,Arial,sans-serif;width:100%;color:#16315a">'
         f'<thead><tr style="text-align:left;background:#f3f4f6">{head}</tr></thead><tbody>{body}</tbody></table>'
-        f'<p style="font:600 14px Helvetica,Arial,sans-serif;margin:10px 2px">{escape(summary)}</p>'
+        f'<p style="font:600 14px Helvetica,Arial,sans-serif;margin:10px 2px 2px;color:#16315a">{escape(summary)}</p></div>'
     )
 
 
@@ -60,9 +64,9 @@ def prompt_html(messages):
     head, _, question = human.rpartition("\n\nQUESTION: ")
     context = head[len("CONTEXT:\n"):] if head.startswith("CONTEXT:\n") else head
     shown = context if len(context) <= 330 else context[:330].rsplit(" ", 1)[0] + " …"
-    return (block("instructions", f"the system message, {len(system):,} characters", system)
+    return (f'<div style="{CARD}">' + block("instructions", f"the system message, {len(system):,} characters", system)
             + block("context", f"{len(context):,} characters" + ("" if shown == context else ", the first lines shown"), shown)
-            + block("question", "from the user", question))
+            + block("question", "from the user", question) + "</div>")
 
 
 def show_prompt(messages):

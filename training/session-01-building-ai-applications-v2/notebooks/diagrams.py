@@ -224,7 +224,7 @@ def render_svg(f: Flow) -> str:
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" width="{width}" height="{height}" style="max-width:100%;height:auto" font-family="{FONT}">',
         f'<defs><marker id="ah" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{EDGE}"/></marker>'
         f'<marker id="ahd" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{DIM_EDGE}"/></marker></defs>',
-        f'<rect width="{width}" height="{height}" rx="10" fill="#ffffff"/>',
+        f'<rect width="{width}" height="{height}" rx="10" fill="#ffffff" stroke="#e1e6ee"/>',
     ]
     for e in f.edges:
         a, b = e[0], e[1]
