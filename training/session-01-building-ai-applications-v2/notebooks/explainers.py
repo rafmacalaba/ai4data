@@ -264,9 +264,142 @@ def data_uri(svg):
     return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
 
 
+INSTR, CTX, QST = "#2f5f9e", "#2f8f5b", "#d9822b"   # instructions, context, question
+
+
+def wrap_lines(text, n):
+    words, lines, cur = text.split(), [], ""
+    for w in words:
+        if len(cur) + len(w) + 1 > n and cur:
+            lines.append(cur); cur = w
+        else:
+            cur = (cur + " " + w).strip()
+    return lines + ([cur] if cur else [])
+
+
+def text_block(x, y, lines, size=12.5, fill=INK, lh=17, weight="400"):
+    return "".join(f'<text x="{x}" y="{y + i * lh}" font-size="{size}" fill="{fill}" font-weight="{weight}">{escape(t)}</text>' for i, t in enumerate(lines))
+
+
+# --------------------------------------------------------------- notebook 01: the three parts of a prompt ------------------------------
+def prompt_svg():
+    W, H, T = 1000, 430, 17.0
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+         f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">What goes into one call to a language model</text>']
+    parts = [
+        ("Instructions", "set by the developer", INSTR, wrap_lines("You are a research assistant for development data. Answer only from the supplied context. Cite the document id…", 44)),
+        ("Context", "supplied by the application", CTX, wrap_lines("[kenya-digital] The share of individuals using the internet in Kenya rose from 7.2 percent of the population in 2010 to 16.6 percent in 2015…", 44)),
+        ("Question", "asked by the user", QST, wrap_lines("How have internet access and economic development evolved in Rwanda and Kenya? …", 44)),
+    ]
+    y, centres = 62, []
+    for i, (name, who, color, lines) in enumerate(parts):
+        s = 0.4 + 1.2 * i
+        h = 30 + 17 * len(lines) + 12
+        centres.append(y + h / 2)
+        block = (f'<rect x="24" y="{y}" width="318" height="{h}" rx="10" fill="{color}" fill-opacity="0.12" stroke="{color}" stroke-width="1.8"/>'
+                 f'<text x="38" y="{y + 22}" font-size="13.5" font-weight="700" fill="{color}">{name}</text>'
+                 f'<text x="330" y="{y + 22}" text-anchor="end" font-size="11.5" fill="{GREY}">{who}</text>'
+                 + text_block(38, y + 44, lines, size=12, fill=INK, lh=17))
+        p.append(group(block, s, 16.3, T, 1))
+        y += h + 14
+    # the prompt card
+    bands = [150, 188, 226]
+    card = ("".join(f'<line x1="342" y1="{c}" x2="404" y2="{b}" stroke="{col}" stroke-width="2" marker-end="url(#ar)"/>' for c, b, col in zip(centres, bands, [INSTR, CTX, QST]))
+            + f'<rect x="398" y="118" width="150" height="150" rx="10" fill="#ffffff" stroke="{BLUE}" stroke-width="1.8"/>'
+            f'<text x="473" y="108" text-anchor="middle" font-size="13" font-weight="700" fill="{BLUE}">One prompt</text>'
+            + "".join(f'<rect x="414" y="{132 + 38 * i}" width="126" height="30" rx="6" fill="{c}" fill-opacity="0.85"/>'
+                      f'<text x="477" y="{152 + 38 * i}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#ffffff">{n}</text>'
+                      for i, (n, c) in enumerate([("instructions", INSTR), ("context", CTX), ("question", QST)])))
+    p.append(group(card, 5.2, 16.3, T, 1))
+    model = (f'<line x1="548" y1="190" x2="598" y2="190" stroke="{BLUE}" stroke-width="2" marker-end="url(#ar)"/>'
+             f'<rect x="604" y="160" width="110" height="60" rx="10" fill="{PALE}" stroke="{BLUE}" stroke-width="1.8"/>'
+             f'<text x="659" y="196" text-anchor="middle" font-size="15" font-weight="700" fill="{BLUE}">model</text>')
+    p.append(group(model, 9.4, 16.3, T, 1))
+    ans_lines = wrap_lines("In Kenya, the share of individuals using the internet rose from 7.2 percent of the population in 2010 to 35.0 percent in 2024 [kenya-digital].", 30)
+    answer = (f'<line x1="714" y1="190" x2="764" y2="190" stroke="{BLUE}" stroke-width="2" marker-end="url(#ar)"/>'
+              f'<rect x="770" y="112" width="206" height="176" rx="10" fill="#ffffff" stroke="{BLUE}" stroke-width="1.8"/>'
+              f'<text x="784" y="136" font-size="13" font-weight="700" fill="{BLUE}">Answer</text>'
+              + text_block(784, 160, ans_lines, size=12, lh=17)
+              + f'<rect x="784" y="{160 + 17 * len(ans_lines) + 4}" width="104" height="20" rx="5" fill="{CTX}" fill-opacity="0.18"/>'
+              f'<text x="792" y="{160 + 17 * len(ans_lines) + 18}" font-size="11.5" font-weight="700" fill="{CTX}">cites its source</text>')
+    p.append(group(answer, 12.6, 16.3, T, 1))
+    caps = [
+        ("1  ·  Three parts go into every call, and each is set by someone different", 0, 5.1, 0),
+        ("2  ·  The application puts them together into one prompt", 5.1, 9.3, 0),
+        ("3  ·  The model writes its answer from that prompt", 9.3, 16.4, 1),
+    ]
+    for label, s, e, base in caps:
+        p.append(group(f'<text x="24" y="{H - 24}" font-size="14.5" font-weight="700" fill="{BLUE}">{escape(label)}</text>', s, e, T, base))
+    p.append("</svg>")
+    return "".join(p)
+
+
+# --------------------------------------------------------------- notebook 01: without and with context -------------------------------------------------------
+def before_after_svg():
+    W, H = 1000, 330
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+         f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">The same question, without and with context</text>',
+         f'<line x1="500" y1="56" x2="500" y2="{H - 20}" stroke="#d5dbe5" stroke-width="1.5"/>']
+    def panel(x0, title, color, inputs, answer_lines, tags):
+        out = [f'<text x="{x0}" y="72" font-size="14.5" font-weight="700" fill="{color}">{title}</text>']
+        for i, t in enumerate(inputs):
+            out.append(f'<rect x="{x0}" y="{92 + 34 * i}" width="150" height="28" rx="6" fill="{PALE}" stroke="{BLUE}"/>'
+                       f'<text x="{x0 + 75}" y="{111 + 34 * i}" text-anchor="middle" font-size="12" fill="{INK}">{escape(t)}</text>')
+        mid = 92 + 34 * (len(inputs) - 1) / 2 + 14
+        out.append(f'<line x1="{x0 + 150}" y1="{mid}" x2="{x0 + 190}" y2="{mid}" stroke="{BLUE}" stroke-width="2" marker-end="url(#ar)"/>'
+                   f'<rect x="{x0 + 196}" y="{mid - 22}" width="70" height="44" rx="8" fill="{PALE}" stroke="{BLUE}" stroke-width="1.6"/>'
+                   f'<text x="{x0 + 231}" y="{mid + 5}" text-anchor="middle" font-size="13" font-weight="700" fill="{BLUE}">model</text>')
+        out.append(f'<rect x="{x0}" y="196" width="440" height="92" rx="10" fill="#ffffff" stroke="{color}" stroke-width="1.8"/>')
+        out.append(text_block(x0 + 12, 218, answer_lines, size=12, lh=17))
+        out.append("".join(f'<rect x="{x0 + 12 + 130 * i}" y="262" width="120" height="20" rx="5" fill="{c}" fill-opacity="0.16"/>'
+                           f'<text x="{x0 + 72 + 130 * i}" y="276" text-anchor="middle" font-size="11.5" font-weight="700" fill="{c}">{escape(t)}</text>' for i, (t, c) in enumerate(tags)))
+        return "".join(out)
+    p.append(panel(24, "Without context", "#9a3a2f", ["question"],
+                   wrap_lines("“Kenya is one of East Africa's most connected economies. Internet penetration is often reported above 80 percent of the population when measured by subscriptions…”", 66),
+                   [("no source", "#9a3a2f"), ("no date", "#9a3a2f"), ("blends measures", "#9a3a2f")]))
+    p.append(panel(524, "With the four country briefs", CTX, ["question", "briefs as context"],
+                   wrap_lines("“In Kenya, the share of individuals using the internet rose from 7.2 percent of the population in 2010 to 35.0 percent in 2024 [kenya-digital]…”", 66),
+                   [("cites its source", CTX), ("dated", CTX), ("one measure", CTX)]))
+    p.append("</svg>")
+    return "".join(p)
+
+
+# --------------------------------------------------------------- notebook 01: what context costs ---------------------------------------------------
+def desk_svg():
+    W, H = 1000, 300
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">Why the application has to choose what the model reads</text>']
+    # desk
+    p.append(f'<rect x="40" y="70" width="420" height="150" rx="12" fill="{LIGHT}" stroke="{BLUE}" stroke-width="2"/>'
+             f'<text x="52" y="94" font-size="13" font-weight="700" fill="{BLUE}">The model’s context window: room for a limited number of pages</text>')
+    for i in range(4):
+        p.append(f'<rect x="{64 + i * 34}" y="{118 + (i % 2) * 6}" width="26" height="36" rx="3" fill="#ffffff" stroke="{CTX}" stroke-width="1.6"/>')
+    p.append(f'<text x="64" y="182" font-size="12.5" fill="{INK}">The four briefs used in this notebook:</text>'
+             f'<text x="64" y="200" font-size="12.5" font-weight="700" fill="{CTX}">about 1,019 tokens. They fit, with room to spare.</text>')
+    # collection
+    p.append(f'<text x="560" y="94" font-size="13" font-weight="700" fill="#9a3a2f">A real collection: thousands of documents</text>')
+    for r in range(5):
+        for c in range(18):
+            p.append(f'<rect x="{556 + c * 24}" y="{108 + r * 28}" width="18" height="24" rx="2" fill="#ffffff" stroke="#9a3a2f" stroke-width="1" opacity="0.8"/>')
+    p.append(f'<line x1="480" y1="150" x2="540" y2="150" stroke="#9a3a2f" stroke-width="2" stroke-dasharray="5 4"/>'
+             f'<text x="510" y="140" text-anchor="middle" font-size="22" fill="#9a3a2f">✕</text>'
+             f'<text x="560" y="262" font-size="12.5" fill="{INK}">It cannot all go on the desk, and every page costs money and dilutes the rest.</text>'
+             f'<text x="24" y="{H - 14}" font-size="14.5" font-weight="700" fill="{BLUE}">So the next notebooks prepare the collection, and the application picks the few pages that matter for each question.</text>')
+    p.append("</svg>")
+    return "".join(p)
+
+
 ALT = {
     "chunking": "Animation: the same Kenya brief cut two ways. Fixed 400-character windows end on a stranded heading and mix two sections; section chunks keep each heading with its paragraph.",
     "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
+    "prompt": "Animation: instructions set by the developer, context supplied by the application and a question asked by the user are combined into one prompt, which goes to the model and produces an answer that cites its source.",
+    "before_after": "Diagram: the same question without context gets an answer with no source, no date and a blend of two measures; with the four country briefs as context it gets a dated answer that cites its source.",
+    "desk": "Diagram: the four briefs of this notebook, about 1,019 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 
 

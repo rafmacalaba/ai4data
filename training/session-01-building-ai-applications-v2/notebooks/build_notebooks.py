@@ -81,8 +81,25 @@ def explainer_md(name: str) -> str:
     """An animated SVG explainer, drawn here at build time and embedded as an image."""
     import explainers
 
-    svg = explainers.chunking_svg()[0] if name == "chunking" else explainers.embeddings_svg()
+    svg = {
+        "chunking": lambda: explainers.chunking_svg()[0],
+        "embeddings": explainers.embeddings_svg,
+        "prompt": explainers.prompt_svg,
+        "before_after": explainers.before_after_svg,
+        "desk": explainers.desk_svg,
+    }[name]()
     return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
+
+
+def helpers_source() -> str:
+    """The hidden helper cell of notebook 01: the functions of visuals.py, with their imports, as a Colab form."""
+    import inspect
+
+    import visuals
+
+    functions = "\n\n".join(inspect.getsource(f).rstrip() for f in (visuals.claim_check_html, visuals.show_claim_check, visuals.prompt_html, visuals.show_prompt))
+    return ('#@title Helpers that draw the table and the prompt below { display-mode: "form" }\n'
+            "from html import escape\nfrom IPython.display import HTML, display\n\n\n" + functions)
 
 
 def md(text: str):
@@ -94,6 +111,27 @@ def md(text: str):
 def code(text: str):
     return new_code_cell(text.strip())
 
+
+CLAIMS_CELL = '''
+def value(ind, country):
+    return w.latest(w.indicator_lookup(ind, country, start=2023))["value"]
+
+
+def growth(country):
+    return [o["value"] for o in w.indicator_lookup("NY.GDP.MKTP.KD.ZG", country, start=2015)["observations"]]
+
+
+rows = [  # (claim, what the model said, what the data says, verdict)
+    ("Kenya · internet use", "“above 80 percent… when measured by subscriptions”",
+     f"{value('IT.NET.USER.ZS', 'Kenya'):.1f}% of people online; {value('IT.CEL.SETS.P2', 'Kenya'):.1f} mobile subscriptions per 100", "blends two measures"),
+    ("Kenya · GDP per capita", "“roughly 2,000 US dollars”", f"{value('NY.GDP.PCAP.CD', 'Kenya'):,.0f} US dollars", "close"),
+    ("Kenya · growth", "“around 5 percent a year over the past decade”", f"{sum(growth('Kenya')) / len(growth('Kenya')):.1f} percent a year, 2015 to 2024", "close"),
+    ("Rwanda · internet use", "“around 30 percent”", f"{value('IT.NET.USER.ZS', 'Rwanda'):.1f}% of people online", "close"),
+    ("Rwanda · GDP per capita", "“close to 1,000 US dollars”", f"{value('NY.GDP.PCAP.CD', 'Rwanda'):,.0f} US dollars", "close"),
+    ("Rwanda · growth", "“frequently above 7 percent”", f"above 7 percent in {sum(g > 7 for g in growth('Rwanda'))} of {len(growth('Rwanda'))} years, 2015 to 2024", "close"),
+]
+show_claim_check(rows)
+'''
 
 # =============================================================================
 # 01
@@ -118,16 +156,33 @@ The worked example for the whole session is one question:
 
 > How have internet access and economic development evolved in Rwanda and Kenya? Compare the recent available data, summarize the main patterns, and cite the sources.
 
+## What you will see
+
+Four short scenes, each with a result you can read:
+
+1. The model answers from what it learned in training. The answer sounds right, and nothing in it can be checked.
+2. The same question with four country briefs supplied. The answer is specific and cites its sources.
+3. A question the briefs cannot answer, and what the model does about it.
+4. A question with two meanings, and what changes when the instructions tell the model to ask.
+
 ## How to run it
 
 Run the cells in order. Without an API key the model outputs are recorded ones, labelled `[recorded output: ...]`; each cell names its scenario with `w.use(...)` before calling the model. With a key in `WORKSHOP_API_KEY` the same cells call the model live.
 """),
-    md(STACK),
+    md("""
+The next cell installs the session's tools and loads its helper module. It takes about a minute the first time, and you do not need to read it.
+"""),
     code(SETUP),
+    code(helpers_source()),
+    md(STACK),
     md("""
 ## 1. A prompt with three parts
 
 Three parts go into every call: **instructions** (the system message), **context** (evidence supplied to the model), and the **question**. LangChain's `ChatPromptTemplate` keeps them as separate slots, and `prompt | model` is the whole application for now. Keeping the parts separate is the first design decision, because each is changed by a different person for a different reason.
+
+@@EXPLAINER:prompt@@
+
+*The animation loops. The text in each box is taken from the cells below.*
 """),
     code('''
 from langchain_core.prompts import ChatPromptTemplate
@@ -160,7 +215,7 @@ answer = chain.invoke({"instructions": INSTRUCTIONS_BASIC, "context": "(none)", 
 w.show(answer)
 '''),
     md("""
-Read the answer against the data. The cell below prints the latest values from the World Development Indicators that the session uses as its reference.
+Read the answer against the data. The first cell prints the latest values from the World Development Indicators that the session uses as its reference. The second sets six claims from the answer beside them.
 """),
     code('''
 for ind in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"]:
@@ -168,12 +223,13 @@ for ind in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"]:
         r = w.indicator_lookup(ind, country, start=2023)
         print(f"{r['name']:50s} {country:7s}", [(o["year"], round(o["value"], 1)) for o in r["observations"]])
 '''),
+    code(CLAIMS_CELL),
     md("""
 What to notice:
 
-- The figures are approximate, undated, and in places wrong. "Internet penetration above 80 percent" is a subscriptions figure presented as internet use; the indicator for individuals using the internet stood at 35 percent in Kenya in 2024.
-- There are no sources a reader could check.
-- The model hedges, which is the right behaviour for a model with no evidence, and of no use to a reader who needs a number.
+- Five of the six claims are close to the data, so the answer sounds reliable.
+- One sentence blends two measures. "Above 80 percent" fits mobile subscriptions (126.5 per 100 people in 2024), not the share of people online (35.0 percent), and nothing in the answer tells the reader which one is meant.
+- No claim names a source or a year, so a reader cannot tell the sound figures from the blended one. The model hedges, which is the right behaviour for a model with no evidence, and of no use to a reader who needs a number they can check.
 
 Prompting changes the style of this answer. It cannot give the model data it does not have.
 """),
@@ -191,6 +247,11 @@ w.use("nb01_with_context")
 answer = chain.invoke({"instructions": INSTRUCTIONS_GROUNDED, "context": context, "question": w.MAIN_QUESTION})
 w.show(answer)
 '''),
+    md("""
+@@EXPLAINER:before_after@@
+
+*The two answers, shortened. They are the recorded outputs of sections 2 and 3.*
+"""),
     md("""
 The figures now come from the briefs, each one is cited, and the comparison is specific. The model did none of the finding; the application did, by putting the right text in front of it.
 
@@ -222,20 +283,20 @@ The first answer picks a reading and runs with it. The second names the readings
 
 ## 6. What the model received
 
-The messages the prompt produced for the last call. The three parts are visible: system instructions, then the context and the question in the human message.
+The messages the prompt produced for the last call, with each part in the colour it had in section 1: the instructions in the system message, then the context and the question in the human message.
 """),
     code('''
 messages = prompt.format_messages(instructions=INSTRUCTIONS_CLARIFY, context=docs["kenya-digital"].page_content, question="How connected is Kenya?")
-for m in messages:
-    print(f"--- {m.type} ({len(m.content):,} characters)")
-    print(m.content[:400] + (" …" if len(m.content) > 400 else ""))
-    print()
+show_prompt(messages)
 '''),
     md("""
 ## 7. What context costs
 
 Four short briefs took about a thousand tokens. A real collection has thousands of documents and cannot be pasted into every call: the context window has a limit, cost grows with every token, and the relevant passages are a small part of the whole. The next two notebooks prepare a collection so that the application can select what to supply.
 
+@@EXPLAINER:desk@@
+"""),
+    md("""
 ## Key points
 
 - An application separates instructions, context, and the question. Each is changed by a different person for a different reason.
@@ -244,7 +305,8 @@ Four short briefs took about a thousand tokens. A real collection has thousands 
 
 ## Exercise
 
-Change `INSTRUCTIONS_GROUNDED` so that the answer is a table with one row per country and columns for the indicator, the latest year, the value, and the source. Rerun section 3. With a live key the output changes; in recorded mode the cell returns the recorded answer, so note the expected result instead.
+1. Read the answers of sections 2 and 3 side by side. For each number, note whether you could check it and where. Then say which answer you would send to a colleague, and why.
+2. Change `INSTRUCTIONS_GROUNDED` so that the answer is a table with one row per country and columns for the indicator, the latest year, the value, and the source. Rerun section 3. With a live key the output changes; in recorded mode the cell returns the recorded answer, so note the expected result instead.
 """),
     md(LINKS),
 ]
