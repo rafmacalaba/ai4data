@@ -1,0 +1,275 @@
+"""Animated SVG explainers for notebook 02: chunking and embeddings.
+
+build_notebooks.py draws each one with chunking_svg() or embeddings_svg() and embeds it in the notebook's
+markdown as an image, so the notebooks import nothing from here. The animations are SMIL, built into the SVG:
+they loop, need no packages, and show their last frame where animation is not supported.
+
+The chunk boundaries come from the splitters the notebook uses, run on assets/documents/kenya-digital.md.
+The similarity scores on the map are the ones the notebook prints; the dot positions and the example
+vector values are illustrative, and the picture says so.
+
+    python explainers.py        # writes chunking.svg and embeddings.svg to the current folder
+"""
+import base64
+import re
+from html import escape
+from pathlib import Path
+
+import frontmatter
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+HERE = Path(__file__).resolve().parent
+DOC = HERE.parent / "assets" / "documents" / "kenya-digital.md"
+
+INK, BLUE, PALE, GREY, LIGHT = "#16315a", "#2f5f9e", "#e8f0fa", "#6b7280", "#f3f4f6"
+CHUNK_COLORS = ["#4c78c8", "#e08a2e", "#3a9d6b", "#8a5cc2"]
+SANS = "Helvetica, Arial, sans-serif"
+MONO = "Menlo, Consolas, 'DejaVu Sans Mono', monospace"
+FADE = 0.4
+
+
+def anim(s, e, total, base):
+    """An element visible from s to e seconds of a loop of `total` seconds; `base` is its opacity without animation."""
+    pts = [(0.0, 0.0)]
+    if s > 0:
+        pts += [(s, 0.0)]
+    pts += [(s + FADE, 1.0), (max(e, s + FADE), 1.0)]
+    if e < total:
+        pts += [(min(e + FADE, total), 0.0)]
+    if pts[-1][0] < total:
+        pts += [(total, pts[-1][1])]
+    keys, vals = [], []
+    for t, v in pts:
+        if keys and abs(t - keys[-1]) < 1e-9:
+            vals[-1] = v
+            continue
+        keys.append(t)
+        vals.append(v)
+    kt = ";".join(f"{k / total:.4f}" for k in keys)
+    vv = ";".join(f"{v:g}" for v in vals)
+    return f'opacity="{base}"><animate attributeName="opacity" dur="{total}s" repeatCount="indefinite" keyTimes="{kt}" values="{vv}"/>'
+
+
+def group(inner, s, e, total, base):
+    return f"<g {anim(s, e, total, base)}{inner}</g>"
+
+
+# ----------------------------------------------------------------- chunking
+def wrap(text, cols=78):
+    """Wrapped lines as (start, end, text) in original offsets, with a gap flag for a new paragraph."""
+    lines, pos = [], 0
+    for para in re.split(r"\n\n", text):
+        start = text.index(para, pos)
+        pos = start + len(para)
+        words = [(m.start() + start, m.end() + start, m.group()) for m in re.finditer(r"\S+", para)]
+        cur = []
+        for w in words:
+            width = sum(len(x[2]) for x in cur) + len(cur) + len(w[2])
+            if cur and width > cols:
+                lines.append((cur[0][0], cur[-1][1], " ".join(x[2] for x in cur), False))
+                cur = []
+            cur.append(w)
+        if cur:
+            lines.append((cur[0][0], cur[-1][1], " ".join(x[2] for x in cur), False))
+        lines[-1] = lines[-1][:3] + (True,)  # paragraph end
+    return lines
+
+
+def chunking_svg():
+    post = frontmatter.load(DOC)
+    text = post.content.strip()
+    windows = [
+        (c.metadata["start_index"], c.metadata["start_index"] + len(c.page_content))
+        for c in RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=50, add_start_index=True).split_documents([Document(page_content=text)])
+    ]
+    heads = [m.start() for m in re.finditer(r"^## .*$", text, re.M)]
+    sections = [(0, heads[1])] + [(heads[i], heads[i + 1] if i + 1 < len(heads) else len(text)) for i in range(1, len(heads))]
+    names = ["Internet use", "Mobile subscriptions", "Population", "Reading the two indicators together"]
+
+    lines = wrap(text)
+    cw, lh, gap, x0, y0 = 7.2, 17, 10, 24, 78
+    ys, y = [], y0
+    for (_, _, _, para_end) in lines:
+        ys.append(y)
+        y += lh + (gap if para_end else 0)
+    doc_bottom = y
+    W, H, T = 960, int(doc_bottom + 80), 17.0
+
+    def overlay(rng, color, opacity=0.30):
+        out = []
+        for (ls, le, t, _), ly in zip(lines, ys):
+            a, b = max(rng[0], ls), min(rng[1], le)
+            if a < b:
+                out.append(f'<rect x="{x0 + (a - ls) * cw:.1f}" y="{ly - 12:.1f}" width="{(b - a) * cw:.1f}" height="{lh}" rx="3" fill="{color}" fill-opacity="{opacity}"/>')
+        return "".join(out)
+
+    def cut_mark(pos):
+        for (ls, le, t, _), ly in zip(lines, ys):
+            if ls <= pos <= le:
+                x = x0 + (pos - ls) * cw
+                return f'<line x1="{x:.1f}" y1="{ly - 14:.1f}" x2="{x:.1f}" y2="{ly + 7:.1f}" stroke="#c0392b" stroke-width="2"/>'
+        return ""
+
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+        f'<text x="{x0}" y="34" font-size="17" font-weight="700" fill="{INK}">Chunking: the same brief, cut two ways</text>',
+        f'<text x="{x0}" y="54" font-size="12.5" fill="{GREY}">kenya-digital.md, 1,301 characters. The chunk boundaries below come from the splitters the notebook uses.</text>',
+    ]
+    for (ls, le, t, _), ly in zip(lines, ys):
+        weight = "700" if t.startswith("#") else "400"
+        parts.append(f'<text x="{x0}" y="{ly}" font-family="{MONO}" font-size="12" font-weight="{weight}" fill="{INK}" textLength="{len(t) * cw:.1f}" lengthAdjust="spacing" xml:space="preserve">{escape(t)}</text>')
+
+    # animated layers: fixed windows
+    t_w0, step, w_end = 2.6, 1.3, 10.4
+    legend_x = 650
+    win_notes = [
+        "ends where a paragraph ends",
+        "ends on a heading, cut off from its paragraph",
+        "starts with that heading again (the overlap)",
+        "mixes two sections in one chunk",
+    ]
+    for i, rng in enumerate(windows):
+        s = t_w0 + i * step
+        inner = overlay(rng, CHUNK_COLORS[i]) + (cut_mark(rng[1]) if i < len(windows) - 1 else "")
+        parts.append(group(inner, s, w_end, T, 0))
+        ly = 96 + i * 62
+        leg = (
+            f'<rect x="{legend_x}" y="{ly - 14}" width="16" height="16" rx="3" fill="{CHUNK_COLORS[i]}" fill-opacity="0.55"/>'
+            f'<text x="{legend_x + 24}" y="{ly}" font-size="13.5" font-weight="700" fill="{INK}">Window {i + 1} · {rng[1] - rng[0]} characters</text>'
+            f'<text x="{legend_x + 24}" y="{ly + 18}" font-size="12.5" fill="{GREY}">{escape(win_notes[i])}</text>'
+        )
+        parts.append(group(leg, s, w_end, T, 0))
+    # animated layers: sections
+    t_s0, s_end = 10.8, 16.4
+    for i, rng in enumerate(sections):
+        s = t_s0 + i * 1.0
+        parts.append(group(overlay(rng, CHUNK_COLORS[i]), s, s_end, T, 1))
+        ly = 96 + i * 62
+        leg = (
+            f'<rect x="{legend_x}" y="{ly - 14}" width="16" height="16" rx="3" fill="{CHUNK_COLORS[i]}" fill-opacity="0.55"/>'
+            f'<text x="{legend_x + 24}" y="{ly}" font-size="13.5" font-weight="700" fill="{INK}">{escape(names[i])}</text>'
+            f'<text x="{legend_x + 24}" y="{ly + 18}" font-size="12.5" fill="{GREY}">{rng[1] - rng[0]} characters · one idea, with its heading</text>'
+        )
+        parts.append(group(leg, s, s_end, T, 1))
+    # captions
+    cy = H - 26
+    caps = [
+        ("A  ·  The document: one country brief, with headings", 0, 2.7, 0),
+        ("B  ·  Fixed windows: cut every 400 characters, whatever the text means", 2.7, 10.5, 0),
+        ("C  ·  Section chunks: one per heading, so each chunk keeps its meaning and can be cited", 10.5, 16.5, 1),
+    ]
+    for label, s, e, base in caps:
+        parts.append(group(f'<text x="{x0}" y="{cy}" font-size="14.5" font-weight="700" fill="{BLUE}">{escape(label)}</text>', s, e, T, base))
+    parts.append("</svg>")
+    return "".join(parts), windows, sections
+
+
+# --------------------------------------------------------------- embeddings
+def embeddings_svg():
+    W, H, T = 960, 430, 19.0
+    p = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+        f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
+        f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff"/>',
+        f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">Embeddings: from text to a position on a map of meaning</text>',
+    ]
+    # phase 1: the chunk card
+    card = (
+        f'<rect x="24" y="76" width="262" height="168" rx="10" fill="{PALE}" stroke="{BLUE}" stroke-width="1.6"/>'
+        f'<text x="38" y="100" font-size="13" font-weight="700" fill="{BLUE}">Kenya · Internet use</text>'
+        + "".join(
+            f'<text x="38" y="{124 + 19 * i}" font-size="12.5" fill="{INK}">{escape(t)}</text>'
+            for i, t in enumerate(
+                ["The share of individuals using", "the internet in Kenya rose from", "7.2 percent of the population in", "2010 to 16.6 percent in 2015 and", "24.7 percent in 2020. Growth …"]
+            )
+        )
+    )
+    p.append(group(card, 0, 18, T, 1))
+    # phase 2: numbers
+    nums = (
+        f'<line x1="290" y1="160" x2="352" y2="160" stroke="{BLUE}" stroke-width="2" marker-end="url(#ar)"/>'
+        f'<text x="321" y="146" text-anchor="middle" font-size="11" fill="{GREY}">embedding</text><text x="321" y="176" text-anchor="middle" font-size="11" fill="{GREY}">model</text>'
+        f'<rect x="358" y="76" width="130" height="168" rx="10" fill="#ffffff" stroke="{BLUE}" stroke-width="1.6"/>'
+        f'<text x="423" y="98" text-anchor="middle" font-size="12.5" font-weight="700" fill="{BLUE}">384 numbers</text>'
+        + "".join(
+            f'<text x="423" y="{120 + 20 * i}" text-anchor="middle" font-family="{MONO}" font-size="12.5" fill="{INK}">{v}</text>'
+            for i, v in enumerate(["0.12", "-0.41", "0.07", "0.33", "-0.18", "0.26", "…"])
+        )
+    )
+    p.append(group(nums, 3.6, 18, T, 1))
+    # phase 3: the map
+    px0, px1, py0, py1 = 508, 936, 52, 372
+    p.append(group(
+        f'<rect x="{px0}" y="{py0}" width="{px1 - px0}" height="{py1 - py0}" rx="10" fill="{LIGHT}" stroke="#d5dbe5"/>'
+        f'<text x="{px0 + 14}" y="{py0 + 22}" font-size="12.5" font-weight="700" fill="{GREY}">A simplified map of meaning</text>',
+        8.0, 18, T, 1))
+    qx, qy = 632.0, 214.0
+    import math
+
+    items = [  # label, score, angle, radius
+        ("Kenya · Internet use", 0.407, -26, 82),
+        ("Rwanda · Internet use", 0.398, 26, 86),
+        ("Kenya · Mobile subscriptions", 0.290, -46, 140),
+        ("Rwanda · Mobile subscriptions", 0.235, 46, 150),
+        ("Kenya · Growth", 0.042, -15, 238),
+        ("Rwanda · Growth", 0.045, 15, 238),
+    ]
+    pts = []
+    for label, score, ang, r in items:
+        pts.append((label, score, qx + r * math.cos(math.radians(ang)), qy + r * math.sin(math.radians(ang))))
+    first = pts[0]
+    # where the card's chunk lands
+    p.append(group(
+        f'<path d="M490,150 C560,100 640,100 {first[2] - 10:.1f},{first[3] - 7:.1f}" fill="none" stroke="{BLUE}" stroke-width="1.6" stroke-dasharray="5 4" marker-end="url(#ar)"/>'
+        f'<text x="560" y="94" font-size="11" fill="{BLUE}">this chunk lands here</text>', 8.4, 13.0, T, 0))
+    for i, (label, score, x, y) in enumerate(pts):
+        s = 8.4 + 0.55 * i
+        top2 = i < 2
+        dot = (
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="8" fill="{BLUE if top2 else PALE}" stroke="{BLUE}" stroke-width="1.6"/>'
+            f'<text x="{x:.1f}" y="{y + 25:.1f}" text-anchor="middle" font-size="11" fill="{INK}">{escape(label)}</text>'
+        )
+        p.append(group(dot, s, 18, T, 1))
+    # phase 4: the question
+    q = [
+        f'<line x1="{qx}" y1="{qy}" x2="{x:.1f}" y2="{y:.1f}" stroke="{BLUE if i < 2 else "#9aa3b2"}" stroke-width="{2 if i < 2 else 1}" stroke-dasharray="{"" if i < 2 else "4 4"}"/>'
+        f'<text x="{x:.1f}" y="{y - 14:.1f}" text-anchor="middle" font-size="12" font-weight="700" fill="{BLUE if i < 2 else GREY}">{score:.3f}</text>'
+        for i, (label, score, x, y) in enumerate(pts)
+    ]
+    star = (
+        f'<polygon points="{qx},{qy - 13} {qx + 4},{qy - 4} {qx + 13},{qy - 4} {qx + 6},{qy + 2} {qx + 9},{qy + 12} {qx},{qy + 6} {qx - 9},{qy + 12} {qx - 6},{qy + 2} {qx - 13},{qy - 4} {qx - 4},{qy - 4}" fill="#e08a2e" stroke="#b86a14" stroke-width="1.2"/>'
+        f'<text x="{qx}" y="{qy - 24}" text-anchor="middle" font-size="12" font-weight="700" fill="#b86a14">your question</text>'
+        f'<text x="{qx}" y="{qy + 32}" text-anchor="middle" font-size="11" fill="#b86a14">“share of people</text>'
+        f'<text x="{qx}" y="{qy + 45}" text-anchor="middle" font-size="11" fill="#b86a14">using the internet”</text>'
+    )
+    p.append(group("".join(q) + star, 13.2, 18, T, 1))
+    p.append(group(
+        f'<text x="{px1 - 12}" y="{py1 - 10}" text-anchor="end" font-size="11" fill="{GREY}">Closest two are retrieved. Scores are similarity, from the notebook run; positions are illustrative.</text>',
+        13.2, 18, T, 1))
+    caps = [
+        ("1  ·  A chunk of text from the collection", 0, 3.7, 0),
+        ("2  ·  An embedding model turns it into a list of numbers (illustrative values)", 3.7, 8.1, 0),
+        ("3  ·  Every chunk becomes a dot: similar meaning lands close together", 8.1, 13.3, 0),
+        ("4  ·  A question becomes a dot too, and the closest chunks are the ones retrieved", 13.3, 18.1, 1),
+    ]
+    for label, s, e, base in caps:
+        p.append(group(f'<text x="24" y="{H - 28}" font-size="14.5" font-weight="700" fill="{BLUE}">{escape(label)}</text>', s, e, T, base))
+    p.append("</svg>")
+    return "".join(p)
+
+
+def data_uri(svg):
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
+ALT = {
+    "chunking": "Animation: the same Kenya brief cut two ways. Fixed 400-character windows end on a stranded heading and mix two sections; section chunks keep each heading with its paragraph.",
+    "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
+}
+
+
+if __name__ == "__main__":
+    Path("chunking.svg").write_text(chunking_svg()[0])
+    Path("embeddings.svg").write_text(embeddings_svg())

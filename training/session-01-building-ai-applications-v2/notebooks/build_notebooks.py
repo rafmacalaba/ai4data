@@ -77,8 +77,17 @@ def diagram_md(name: str) -> str:
     return f"![{diagrams.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
 
 
+def explainer_md(name: str) -> str:
+    """An animated SVG explainer, drawn here at build time and embedded as an image."""
+    import explainers
+
+    svg = explainers.chunking_svg()[0] if name == "chunking" else explainers.embeddings_svg()
+    return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
+
+
 def md(text: str):
     text = re.sub(r"@@DIAGRAM:(\w+)@@", lambda m: diagram_md(m.group(1)), text)
+    text = re.sub(r"@@EXPLAINER:(\w+)@@", lambda m: explainer_md(m.group(1)), text)
     return new_markdown_cell(text.strip())
 
 
@@ -293,6 +302,10 @@ A chunk is the unit that retrieval returns and the model reads. Two LangChain sp
 
 - `RecursiveCharacterTextSplitter`: windows of 400 characters with an overlap. Simple, and blind to the document's structure.
 - `MarkdownHeaderTextSplitter`: one chunk per heading, with the heading kept in the text and the section name added to the metadata.
+
+@@EXPLAINER:chunking@@
+
+*The animation loops. It is drawn from the real brief and the two splitters, so the boundaries are the ones the cell below prints.*
 """),
     code('''
 kenya = [d for d in docs if d.metadata["id"] == "kenya-digital"]
@@ -307,11 +320,15 @@ print(sections[1].page_content)
 print("\\nmetadata:", sections[1].metadata["section"], "|", sections[1].metadata["date"], "|", sections[1].metadata["country"])
 '''),
     md("""
-The fixed window starts and ends mid-sentence and carries no heading, so a passage about mobile subscriptions can be retrieved for a question about internet use without anything in the chunk saying which it is. The section chunk carries its title and heading, which both the retriever and the model can use.
+The fixed window cuts by length, not by meaning. This one starts in the middle of the Internet use section, carries no heading of its own, and ends with the heading of the next section, separated from the paragraph it introduces. A passage about internet use is then stored next to a mobile-subscriptions heading, and nothing in the chunk says which section it belongs to. The section chunk carries its title and heading, which both the retriever and the model can use.
 
 ## 4. Embeddings
 
 An embedding is a vector that places a text so that texts with similar meaning are close. The session uses a small sentence-transformer model through LangChain's `HuggingFaceEmbeddings`; it downloads about 90 MB on first use. The cell embeds a few sections and a query and ranks the sections by similarity.
+
+@@EXPLAINER:embeddings@@
+
+*The animation loops. The similarity scores are the ones the cell below prints; the dot positions and the example numbers are illustrative.*
 """),
     code('''
 import numpy as np
@@ -452,7 +469,7 @@ w.show((prompt | model).invoke({"context": w.format_context(merged), "question":
     md("""
 ## 3. A retrieval failure: outdated evidence
 
-"What are the latest available figures for internet use in Kenya and Rwanda?" The 2016 summary contains the words "latest available figures" and ranks first. With two passages supplied, the Kenya figure comes from 2016 and the Rwanda figure from 2026, and the model reports both faithfully.
+"What are the latest available figures for internet use in Kenya and Rwanda?" The 2016 summary contains the words "latest available figures" and ranks first. With two passages supplied, the Kenya figure comes from the 2016 summary (a 2015 value) and the Rwanda figure from a 2026 brief (a 2024 value), and the model reports both faithfully.
 """),
     code('''
 q = "What are the latest available figures for internet use in Kenya and Rwanda?"
