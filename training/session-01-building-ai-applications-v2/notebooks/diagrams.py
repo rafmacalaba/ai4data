@@ -40,7 +40,7 @@ DASH = ' stroke-dasharray="5 4"'
 
 ALT = {
     "prompt": "Diagram: the question and the context feed the prompt, which goes to the model and produces the answer.",
-    "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, built in notebook 03: the question and the retrieved context from the vector store feed the prompt, then the model and the answer.",
+    "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, built in notebook 03: the question and the retrieved passages from the vector store feed the prompt, then the model and the answer.",
     "retrieval": "Diagram: the question goes to a retriever, which returns top-k passages; the passages and the question go into the prompt, then the model and an answer with citations.",
     "tools": "Diagram: the question goes to the model, which calls the tool get_indicator with an indicator, a country and optional start and end years, and receives data that returns to the model, which answers with text or an object that matches a schema. Separately, the same tool is served over MCP to any MCP client, such as this notebook, a chatbot or a desktop assistant.",
     "agent": "Diagram: the question goes to the model, which calls search_documents with a query, getting passages, or get_indicator with an indicator, a country and optional start and end years, getting data; the results return to the model, which answers. The tools run in a fixed order in a chain, or are chosen by the model, with a recursion limit and a trace.",
@@ -82,7 +82,7 @@ def flow(name: str, stage: int | None = None) -> Flow:
                 ("e", "embeddings", "normal"),
                 ("v", "vector store", "hot"),
                 ("q", "question", "dim"),
-                ("p", "prompt\ninstructions +\nretrieved context", "dim"),
+                ("p", "prompt\ninstructions +\nretrieved passages", "dim"),
                 ("m", "model", "dim"),
                 ("a", "answer", "dim"),
             ],

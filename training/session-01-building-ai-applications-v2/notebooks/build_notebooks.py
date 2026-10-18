@@ -341,7 +341,7 @@ NB02 = [
 
 ## Objective
 
-Notebook 01 ended with a problem: an application cannot hand the model every document it has, so it has to select what to supply. Selecting needs a collection that has been prepared: documents together with information about them, cut into pieces that keep their meaning, and placed where a search can find them by meaning. This notebook builds that collection, and shows how the choices made here decide what retrieval can find later.
+Notebook 01 ended with a problem: an application cannot hand the model every document it has, so it has to select what to supply. Selecting needs a collection that has been prepared: documents together with information about them, cut into pieces, called chunks, that keep their meaning, and placed where a search can find them by meaning. This notebook builds that collection, and shows how the choices made here decide what retrieval can find later.
 
 ## The application after this notebook
 
@@ -406,14 +406,14 @@ print(d.page_content)
     md("""
 ## 3. Chunking: fixed windows against sections
 
-A chunk is the unit that retrieval returns and the model reads. Two LangChain splitters on the same brief:
+A chunk is the unit that is stored and searched: a search returns whole chunks. Two LangChain splitters on the same brief:
 
 - `RecursiveCharacterTextSplitter`: windows of 400 characters with an overlap. Simple, and blind to the document's structure.
 - `MarkdownHeaderTextSplitter`: one chunk per heading, with the heading kept in the text and the section name added to the metadata.
 
 @@EXPLAINER:chunking@@
 
-*The animation loops. It is drawn from the real brief and the two splitters. The cell below prints how many pieces each splitter made (4 windows and 4 sections) and shows two of them: window 2 of the fixed split, and the Mobile subscriptions section.*
+*The animation loops. It is drawn from the real brief and the two splitters. The cell below prints how many chunks each splitter made (4 windows and 4 sections) and shows two of them: window 2 of the fixed split, and the Mobile subscriptions section.*
 """),
     code('''
 kenya = [d for d in docs if d.metadata["id"] == "kenya-digital"]
@@ -461,7 +461,7 @@ Two versions of the same collection, searched with the same question.
 - **Prepared badly:** the metadata dropped, every document joined into one long text, and cut into fixed windows.
 - **Prepared well:** what sections 1 to 4 built, with metadata and one chunk per section.
 
-Each version is kept in a **vector store**: a place that holds the pieces together with their numbers, and can find the ones closest to a question. The question needs two figures, Kenya's latest and Rwanda's latest. The cell shows the top three pieces each search returns, and marks which of the two figures turn up in them.
+Each version is kept in a **vector store**: a place that holds the chunks together with their numbers, and can find the ones closest to a question. The question needs two figures, Kenya's latest and Rwanda's latest. The cell shows the top three chunks each search returns, and marks which of the two figures turn up in them.
 """),
     code('''
 from langchain_core.documents import Document
@@ -498,10 +498,10 @@ def numbers_found(store):
 
 for name, store in (("Prepared badly", poor), ("Prepared well", good)):
     found, total = numbers_found(store)
-    print(f"{name}: {found} of {total} needed numbers appear in the top 3 pieces, across the eight evaluation questions")
+    print(f"{name}: {found} of {total} needed numbers appear in the top 3 chunks, across the eight evaluation questions")
 '''),
     md("""
-Prepared badly, the search does not find Kenya's latest figure. Its top three pieces are the 2016 summary, Rwanda's internet paragraph, and a window that starts in the last section of Rwanda's brief and runs on into the title of the next document. Every piece is labelled `blob`, so a reader cannot tell where any of it came from or how old it is. Prepared well, the same question finds both figures, and each piece names its document, section, and year. The 2016 summary comes first in both, because a search matches meaning, not age; its date is what the next notebook uses to deal with it.
+Prepared badly, the search does not find Kenya's latest figure. Its top three chunks are the 2016 summary, Rwanda's internet paragraph, and a window that starts in the last section of Rwanda's brief and runs on into the title of the next document. Every chunk is labelled `blob`, so a reader cannot tell where any of it came from or how old it is. Prepared well, the same question finds both figures, and each chunk names its document, section, and year. The 2016 summary comes first in both, because a search matches meaning, not age; its date is what the next notebook uses to deal with it.
 
 The second cell counts the same thing across all eight evaluation questions. The gap is smaller there, because for several questions both versions find what they need.
 
@@ -526,7 +526,7 @@ This store lives in memory and disappears when the notebook closes, which is eno
 - Metadata is information about a document that its text does not say: date, type, country, source. The 2016 summary sounds current; its date, kept as metadata, is how an application can tell that it is old. An application can use the date only if it kept it.
 - Chunk boundaries decide what retrieval can return. Fixed windows cut by length and can separate a heading from its paragraph; section chunks keep the heading with its meaning.
 - Embeddings place text by meaning, so a question lands near the chunks that answer it. They know nothing about dates.
-- A collection prepared badly returns pieces that cannot be cited or dated, and can miss the figures a question needs. Prepared well, each hit names its document, section, and year, and the figures turn up.
+- A collection prepared badly returns chunks that cannot be cited or dated, and can miss the figures a question needs. Prepared well, each hit names its document, section, and year, and the figures turn up.
 - Preparation decides what retrieval can find. The next notebook uses the collection to answer questions, and shows where it still goes wrong.
 
 ## Exercise
