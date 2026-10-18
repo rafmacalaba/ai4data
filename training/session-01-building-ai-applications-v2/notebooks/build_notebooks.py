@@ -563,7 +563,7 @@ Retrieval (the search) and the passages it returns are what this notebook adds, 
 Four short scenes:
 
 1. The question from notebook 01 answered from the store. The answer cites its passages, but half of the question goes unanswered.
-2. Why the economy briefs never reached the model, and a fix that searches once for each part of the question.
+2. Why the economy briefs never reached the model, and a fix that breaks the question into its parts and searches once for each.
 3. The 2016 summary outranking the 2026 briefs, and the date from notebook 02 removing it.
 4. A question the collection cannot answer still gets passages, and how to test a search without calling the model.
 
