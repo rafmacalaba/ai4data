@@ -714,9 +714,6 @@ With the filter, the 2016 summary is gone and both figures come back. The model'
 w.use("nb03_rag_filtered")
 w.show(make_rag(k=2, where=since_2020).invoke(q))
 '''),
-    md("""
-Now idea 2, rewording. The cell below searches for what the passage would say, and the 2016 summary still ranks first, because its wording is close to any question about figures. The filter works where rewording does not because the date is metadata, and the embedding (the list of numbers that stands for a chunk's meaning, from notebook 02) is made from the text alone, so it does not see the date.
-"""),
     code('''
 w.print_hits(hits("Kenya and Rwanda internet use 2024, percent of population", k=2))
 '''),
