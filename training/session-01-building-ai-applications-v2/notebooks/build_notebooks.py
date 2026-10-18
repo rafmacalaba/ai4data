@@ -606,9 +606,11 @@ def hits(question, k=4, where=None):
     md("""
 ## 1. The question from notebook 01, answered from the store
 
-The search returns the four chunks closest to the question, and they become the passages the model reads. The cell prints them first, so that the evidence the model saw is visible, then the model's answer.
+The question is the main one from notebook 01. The search returns the four chunks closest to it, and they become the passages the model reads. The cell prints the question, then the passages, so that the evidence the model saw is visible, then the model's answer.
 """),
     code('''
+w.show("Question: " + w.MAIN_QUESTION)
+print()
 w.print_hits(hits(w.MAIN_QUESTION, k=4))
 print()
 w.use("nb03_rag_main")
