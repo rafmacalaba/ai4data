@@ -450,12 +450,61 @@ def metadata_svg():
 
 
 
+# --------------------------------------------------------------- notebook 04: the model asks, the application runs the tool -------------------
+def toolloop_svg():
+    W, H, T = 1000, 540, 20.0
+    xs = {"model": 170, "app": 500, "tool": 830}
+    green = CTX
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+         f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
+         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">How a model uses a tool: it asks, the application runs it</text>']
+    heads = [("model", "The model", "writes text, runs nothing", PALE, BLUE), ("app", "The application", "your code", LIGHT, INK), ("tool", "The tool", "get_indicator, over the data", "#e4f3ea", green)]
+    for key, name, sub, fill, col in heads:
+        x = xs[key]
+        p.append(f'<rect x="{x - 105}" y="56" width="210" height="50" rx="10" fill="{fill}" stroke="{col}" stroke-width="1.8"/>'
+                 f'<text x="{x}" y="77" text-anchor="middle" font-size="14.5" font-weight="700" fill="{col}">{name}</text>'
+                 f'<text x="{x}" y="96" text-anchor="middle" font-size="11.5" fill="{GREY}">{sub}</text>'
+                 f'<line x1="{x}" y1="106" x2="{x}" y2="{H - 62}" stroke="#c9d1de" stroke-width="1.5" stroke-dasharray="5 5"/>')
+
+    def step(n, y, src, dst, label, s, e, col=BLUE):
+        x1, x2 = xs[src], xs[dst]
+        d = 1 if x2 > x1 else -1
+        mid = (x1 + x2) / 2
+        w = max(len(label) * 6.6 + 24, 120)
+        inner = (f'<line x1="{x1 + 6 * d}" y1="{y}" x2="{x2 - 6 * d}" y2="{y}" stroke="{col}" stroke-width="2.2" marker-end="url(#ar)"/>'
+                 f'<rect x="{mid - w / 2}" y="{y - 31}" width="{w}" height="25" rx="6" fill="#ffffff" stroke="{col}" stroke-opacity="0.5"/>'
+                 f'<text x="{mid}" y="{y - 14}" text-anchor="middle" font-size="12.5" fill="{INK}">{escape(label)}</text>'
+                 f'<circle cx="{x1 + 6 * d - 0}" cy="{y}" r="0"/>')
+        p.append(group(inner, s, e, T, 1))
+
+    end = 19.3
+    step(1, 150, "app", "model", "question + the tools it may ask for", 0.4, end)
+    step(2, 215, "model", "app", "asks: get_indicator(GDP per capita, Rwanda, 2023)", 5.0, end)
+    step(3, 280, "app", "tool", "runs it", 9.5, end, green)
+    step(4, 335, "tool", "app", "2023: 1,061 · source · claim id", 11.0, end, green)
+    step(5, 400, "app", "model", "hands the result back", 14.3, end)
+    step(6, 465, "model", "app", "answer: 1,061 US dollars in 2023 [source]", 16.2, end)
+    caps = [
+        ("1  ·  The application sends the question, and says which tools the model may ask for", 0, 4.9, 0),
+        ("2  ·  The model runs nothing: it replies with a request that names the tool and fills in its details", 4.9, 9.4, 0),
+        ("3  ·  The application runs the tool, and the tool returns data", 9.4, 14.2, 0),
+        ("4  ·  The application hands the result back, and the model writes its answer from it", 14.2, 20.4, 1),
+    ]
+    for label, s, e, base in caps:
+        p.append(group(f'<text x="24" y="{H - 24}" font-size="14.5" font-weight="700" fill="{BLUE}">{escape(label)}</text>', s, e, T, base))
+    p.append("</svg>")
+    return "".join(p)
+
+
+
 ALT = {
     "chunking": "Animation: the same Kenya brief cut two ways. Fixed 400-character windows end on a stranded heading and mix two sections; section chunks keep each heading with its paragraph.",
     "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
     "prompt": "Animation: instructions set by the developer, context supplied by the application and a question asked by the user are combined into one prompt, which goes to the model and produces an answer that cites its source.",
     "before_after": "Diagram: the same question without context gets an answer with no source, no date and a blend of two measures; with the four country briefs as context it gets a dated answer that cites its source.",
     "metadata": "Diagram: one document in two parts. Its metadata, the header of the file, holds the date 2016-06-01; its text sounds current and ends 'The latest available figures are for 2015.' An application can filter and rank on the date field, but it does not read the text for age.",
+    "toolloop": "Animation: the application sends the model the question and the list of tools; the model replies with a request for get_indicator with GDP per capita, Rwanda and 2023; the application runs the tool, which returns 1,061 with its source and claim id; the application hands that back and the model answers that it was 1,061 US dollars in 2023.",
     "desk": "Diagram: the four briefs of this notebook, about 1,024 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 

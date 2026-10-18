@@ -47,7 +47,7 @@ def claim_check_html(rows, source="none"):
 
 
 def table_html(headers, rows, source=""):
-    """A small table in a light card. Cells that look like numbers are right-aligned."""
+    """A small table in a light card. A column whose cells are all numbers is right-aligned; the others are left-aligned."""
     import re
 
     cell = "padding:7px 12px;border-bottom:1px solid #e5e9f0;vertical-align:top"
@@ -63,9 +63,10 @@ def table_html(headers, rows, source=""):
         bad = text == "miss" or (count and count.group(1) != count.group(2))
         return ";font-weight:600;color:" + ("#1f6b43" if good else "#8e2b21") if good or bad else ""
 
-    head = "".join(f'<th style="padding:7px 12px;text-align:{"right" if i >= 2 else "left"}">{escape(str(h))}</th>' for i, h in enumerate(headers))
+    numeric = [all(align(row[i]) == "right" for row in rows) for i in range(len(headers))]   # a column of numbers is right-aligned, its header too
+    head = "".join(f'<th style="padding:7px 12px;text-align:{"right" if numeric[i] else "left"}">{escape(str(h))}</th>' for i, h in enumerate(headers))
     body = "".join(
-        "<tr>" + "".join(f'<td style="{cell};text-align:{align(c)}{mark(c)}">{escape(str(c))}</td>' for c in row) + "</tr>"
+        "<tr>" + "".join(f'<td style="{cell};text-align:{"right" if numeric[i] else "left"}{mark(c)}">{escape(str(c))}</td>' for i, c in enumerate(row)) + "</tr>"
         for row in rows
     )
     note = f'<p style="font:12.5px Helvetica,Arial,sans-serif;margin:8px 2px 2px;color:#6b7280">{escape(source)}</p>' if source else ""

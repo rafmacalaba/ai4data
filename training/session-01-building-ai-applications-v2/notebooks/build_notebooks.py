@@ -91,6 +91,7 @@ def explainer_md(name: str) -> str:
         "before_after": explainers.before_after_svg,
         "desk": explainers.desk_svg,
         "metadata": explainers.metadata_svg,
+        "toolloop": explainers.toolloop_svg,
     }[name]()
     return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
 
@@ -777,55 +778,110 @@ NB04 = [
     md("""
 # 04 · Connecting the application to data and tools
 
-**Session 01 · notebook 4 of 6**
+**Session 01 · Building AI applications for research and data · notebook 4 of 6**
 
 ## Objective
 
-Give the model a tool that returns authoritative statistics, watch it call the tool, make its output a typed object that other software can read, and expose the same tool over the Model Context Protocol with FastMCP.
+Notebook 03 ended on a limit of search. Even when the right documents come back, the passages may not hold the figures an answer needs: for the main question, the four passages held two of the four numbers. For numbers, the application can skip the search and ask a tool instead, which looks the figure up in the data itself. This notebook gives the model such a tool, watches it use the tool, makes its answer a form that other software can read, and then offers the same tool to other programs.
+
+Three terms, in plain words:
+
+- A **tool** is a function that the application can run for the model. The model cannot run it itself: it asks, the application runs it, and the result goes back to the model.
+- A **schema** is a form with named fields and types ("year: a whole number") that an answer must fill in, so that another program can read it.
+- **MCP**, the Model Context Protocol, is a standard plug for tools. A tool offered through it can be used by any program that speaks the standard, such as a chatbot or a desktop assistant.
 
 ## The application after this notebook
 
 @@DIAGRAM:tools@@
 
-The tool call and the data it returns are what this notebook adds, and the same tool is then served over MCP.
+The tool call and the data it returns are what this notebook adds, and the same tool is then served over MCP. Passages from notebook 03 are for definitions and context. Numbers come from a tool over the data.
 
-Passages are for definitions and context. Numbers come from a tool over the data.
+## What you will see
+
+Five short scenes:
+
+1. The four figures that the main question needs: what the search of notebook 03 found, and what the tool returns.
+2. The tool as the model sees it, and an animation of the model asking for it, step by step.
+3. A year that has no data: the tool says so, and the model passes it on.
+4. The answer as a filled-in form that other software can read, and what happens when a field is damaged.
+5. The same tool offered over MCP and used by an agent, and an optional call to a public server.
+
+## How to run it
+
+Run the cells in order. The model's answers are recorded ones, labelled `[recorded output: ...]`, as in notebook 01. The tool results, tables and checks are computed when you run the cell. The last cell is optional: it reaches a public server and needs the internet.
 """),
     code(SETUP),
     md("""
-## 1. A number from memory and a number from data
+## 1. Search and tool, for the same four figures
+
+Section 6 of notebook 03 found that the main question needs four numbers: internet use and GDP per capita, for Kenya and Rwanda, in 2024. The cell rebuilds the store of notebook 03 in three lines, runs the same search for the four closest passages, and checks for each number whether it is in them. Beside it, the tool's answer for the same figure.
+"""),
+    code('''
+docs = w.load_documents()
+store = w.build_store(w.split_sections(docs))   # the store of notebooks 02 and 03
+
+needed = next(item for item in w.load_questions() if item["id"] == "q1")["expected_numbers"]
+passages = store.similarity_search(w.MAIN_QUESTION, k=4)
+text = " ".join(p.page_content for p in passages)
+
+countries = {"KEN": "Kenya", "RWA": "Rwanda"}
+figures = {"IT.NET.USER.ZS": ("internet use, % of population", "{:.1f}"), "NY.GDP.PCAP.CD": ("GDP per capita, US dollars", "{:,.0f}")}
+
+rows = []
+for n in needed:
+    name, fmt = figures[n["indicator"]]
+    result = w.indicator_lookup(n["indicator"], countries[n["country"]], start=n["year"], end=n["year"])
+    rows.append((countries[n["country"]], name, n["year"],
+                 "hit" if w.numbers_present(text, [n])[0] == 1 else "miss",
+                 fmt.format(w.latest(result)["value"])))
+w.show_table(["country", "figure", "year", "in the 4 passages", "from the tool"], rows, source="The search is the one of notebook 03, section 1.")
+'''),
+    md("""
+The search found two of the four. The tool returned all four, each with the indicator, the year, the source and a `claim_id`, a label of the form indicator:country:year that notebook 06 uses to check an answer against the data. A tool does not guess which passage might hold a figure: the application asks for the figure by name.
+
+The model's own memory is a third way to get a number, and the weakest. The cell asks the model for Rwanda's GDP per capita in 2023, then asks the tool.
 """),
     code('''
 w.use("nb04_from_memory")
 w.show(model.invoke("What was Rwanda's GDP per capita in 2023?"))
 print()
 r = w.indicator_lookup("NY.GDP.PCAP.CD", "Rwanda", start=2023, end=2023)
-print("Data:", r["name"], r["observations"], "·", r["source"])
+w.show_table(["year", "value", "claim_id"], [(o["year"], f"{o['value']:,.1f}", o["claim_id"]) for o in r["observations"]], source=f"{r['name']} · {r['source']}")
 '''),
     md("""
-The memory answer is close and hedged, with no way for a reader to tell how close. The data answer carries the indicator, the year, the value, the source, and a `claim_id` that notebook 06 will use to verify it.
+The answer from memory is close and hedged, and nothing tells a reader how close. The tool's answer is exact and carries its source.
 
-## 2. The tool and its schema
+## 2. The tool, as the model sees it
 
-`get_indicator` is a Python function decorated with LangChain's `@tool`. The docstring becomes the description the model reads, and the type hints become the parameter schema. The model fills the parameters from the question.
+`get_indicator` is a Python function decorated with LangChain's `@tool`. Its docstring becomes the description the model reads, and its type hints become the form the model fills in: one field for each parameter. The cell shows both, and the five indicators the data holds.
+"""),
+    code('''
+print("name:       ", w.get_indicator.name)
+print("description:", w.get_indicator.description)
+print()
+
+meaning = {"indicator": "which series, as an id such as IT.NET.USER.ZS", "country": "a name or a three-letter code",
+           "start": "the first year wanted", "end": "the last year wanted"}
+kinds = {"string": "text", "integer": "whole number"}
+fields = []
+for field, spec in w.get_indicator.args.items():
+    kind = spec.get("type") or " or ".join(a["type"] for a in spec["anyOf"] if a["type"] != "null")
+    fields.append((field, kinds.get(kind, kind), "optional" if "default" in spec else "required", meaning[field]))
+w.show_table(["field", "type", "", "meaning"], fields, source="The form the model fills in, from the tool's type hints.")
+print()
+w.show_table(["indicator id", "name"], [(i["id"], i["name"]) for i in w.list_indicators()], source="The series the tool can look up.")
+'''),
+    md("""
+## 3. The model asks, the application runs the tool
+
+A model does not run tools. It replies with a request that names the tool and fills in the form, the application runs the tool, and the result goes back to the model, which then answers. The animation shows the exchange.
+
+@@EXPLAINER:toolloop@@
+
+`bind_tools` tells the model which tools exist. The cell does the exchange once, written out, and labels the three steps. Notebook 05 lets LangGraph run this loop.
 """),
     code('''
 import json
-
-print("name:       ", w.get_indicator.name)
-print("description:", w.get_indicator.description)
-print(json.dumps(w.get_indicator.args, indent=2))
-print()
-print("available indicators:")
-for i in w.list_indicators():
-    print(f"  {i['id']:20s} {i['name']}")
-'''),
-    md("""
-## 3. The model calls the tool, step by step
-
-`bind_tools` tells the model which tools exist. The model answers with a tool call; the application runs the tool, returns the result as a `ToolMessage`, and calls the model again. Notebook 05 lets LangGraph run this loop; here it is written out once so that the mechanics are visible.
-"""),
-    code('''
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
 INSTRUCTIONS = """You are a research assistant for development data.
@@ -836,19 +892,23 @@ model_with_tools = model.bind_tools([w.get_indicator])
 messages = [SystemMessage(content=INSTRUCTIONS), HumanMessage(content="What was Rwanda's GDP per capita in 2023?")]
 
 w.use("nb04_tool_call")
+print("1. The model asks for the tool:")
 reply = model_with_tools.invoke(messages)
 w.show(reply)
 for call in reply.tool_calls:
     result = w.get_indicator.invoke(call["args"])
-    print("tool result:", json.dumps(result)[:160], "…")
+    print()
+    print("2. The application runs it, and the tool returns:")
+    w.show_table(["year", "value", "claim_id"], [(o["year"], f"{o['value']:,.1f}", o["claim_id"]) for o in result["observations"]], source=f"{result['name']} · {result['source']}")
     messages += [reply, ToolMessage(content=json.dumps(result), tool_call_id=call["id"])]
 print()
+print("3. The model writes its answer from the result:")
 w.show(model_with_tools.invoke(messages))
 '''),
     md("""
 ## 4. Data that does not exist
 
-The planted problem: a year with no observation. The tool returns an empty list, and the instructions say what to do with it.
+The planted problem: a year with no observation. The tool returns an empty list, and the instructions say what to do with it. The cell prints what the tool returned, then the model's answer.
 """),
     code('''
 messages = [SystemMessage(content=INSTRUCTIONS), HumanMessage(content="What share of Kenya's population used the internet in 2025?")]
@@ -864,13 +924,29 @@ w.show(model_with_tools.invoke(messages))
     md("""
 Compare with notebook 01, where the model answered the same question from a brief. Here the absence is a fact returned by the tool, which the application can test for.
 
-## 5. Structured output
+## 5. The answer as a filled-in form
 
-An answer that another program will read, store, or display needs a fixed shape. `ComparisonAnswer` is a Pydantic model; `with_structured_output` sends its schema with the request and validates the response on the way back.
+An answer that another program will read, store or display needs a fixed shape. `ComparisonAnswer` is the form, a Pydantic model: for each country, the latest internet figure and the latest GDP figure, each with its year, value and claim id, then a comparison text, the sources and any caveats. `with_structured_output` sends the form with the request and checks the response against it on the way back. The cell lists the form's fields.
 """),
     code('''
-print(json.dumps(w.ComparisonAnswer.model_json_schema(), indent=2)[:1200], "…")
+import typing
+
+
+def type_name(annotation):
+    plain = {"str": "text", "int": "whole number", "float": "number"}
+    inner = typing.get_args(annotation)
+    name = inner[0].__name__ if inner else annotation.__name__
+    return ("list of " if inner else "") + plain.get(name, name)
+
+
+fields = [("ComparisonAnswer", name, type_name(f.annotation), "required" if f.is_required() else "optional") for name, f in w.ComparisonAnswer.model_fields.items()]
+fields += [("CountrySummary", name, type_name(f.annotation), "required") for name, f in w.CountrySummary.model_fields.items()]
+fields += [("Observation", name, type_name(f.annotation), "required") for name, f in w.Observation.model_fields.items()]
+w.show_table(["part of the form", "field", "type", ""], fields, source="CountrySummary is filled in once per country; Observation once per figure.")
 '''),
+    md("""
+The next cell gives the model the tool's data and asks it to fill in the form. The result is a Python object, shown as a table of the figures and then the text fields.
+"""),
     code('''
 data = [w.indicator_lookup(i, c, start=2024) for i in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"] for c in ["Kenya", "Rwanda"]]
 structured = model.with_structured_output(w.ComparisonAnswer)
@@ -880,14 +956,14 @@ parsed = structured.invoke([
     SystemMessage(content="Fill the schema from the data you are given. Use the claim_id values exactly as given."),
     HumanMessage(content="DATA:\\n" + json.dumps(data) + "\\n\\nQUESTION: " + w.MAIN_QUESTION),
 ])
-for cs in parsed.countries:
-    print(cs.country, "internet", cs.internet_latest.year, cs.internet_latest.value, "| GDP pc", cs.gdp_per_capita_latest.year, round(cs.gdp_per_capita_latest.value))
+w.show_table(["country", "internet use, year", "internet use, %", "GDP per capita, year", "GDP per capita, US$"],
+             [(countries[cs.country], cs.internet_latest.year, f"{cs.internet_latest.value:.1f}", cs.gdp_per_capita_latest.year, f"{cs.gdp_per_capita_latest.value:,.0f}") for cs in parsed.countries])
 print()
-print(parsed.comparison)
-print(parsed.sources)
+w.show("comparison: " + parsed.comparison)
+print("sources:   ", "; ".join(parsed.sources))
 '''),
     md("""
-Validation is what makes the schema a contract. The cell below damages the JSON and shows the error that a downstream program would receive. Without validation it would receive a wrong value and no error.
+The checking is what makes the form a contract. The cell damages the answer by replacing a year with words, and shows the error that a program reading it would receive. Without the check the program would receive a wrong value and no error.
 """),
     code('''
 from pydantic import ValidationError
@@ -896,12 +972,14 @@ damaged = parsed.model_dump_json().replace('"year":2024', '"year":"twenty twenty
 try:
     w.ComparisonAnswer.model_validate_json(damaged)
 except ValidationError as e:
-    print(e.errors()[0]["loc"], "->", e.errors()[0]["msg"])
+    field = " > ".join(str(part) for part in e.errors()[0]["loc"])
+    print("field:  ", field)
+    print("problem:", e.errors()[0]["msg"])
 '''),
     md("""
 ## 6. The same tool over MCP
 
-The Model Context Protocol (MCP) is a standard way to expose tools to any client. `indicator_server.py` wraps `get_indicator` in a FastMCP server in a dozen lines; the FastMCP client starts it as a subprocess, lists its tools, and calls one. A chatbot, a desktop assistant, or an agent connects the same way.
+MCP is the standard plug: a tool written once as a server can be used by any program that speaks the standard, whether a chatbot, a desktop assistant or an agent. `indicator_server.py` wraps `get_indicator` in a FastMCP server in a dozen lines. The FastMCP client below starts it, lists its tools and calls one.
 """),
     code('''
 from fastmcp import Client
@@ -910,11 +988,12 @@ async with Client(w.mcp_server_transport()) as client:
     for t in await client.list_tools():
         print(f"{t.name:16s} {t.description[:90]}")
     result = await client.call_tool("get_indicator", {"indicator": "IT.NET.USER.ZS", "country": "Rwanda", "start": 2022})
+    data = result.data
     print()
-    print(result.data)
+    w.show_table(["year", "value", "claim_id"], [(o["year"], f"{o['value']:,.1f}", o["claim_id"]) for o in data["observations"]], source=f"{data['name']} · {data['source']}")
 '''),
     md("""
-A LangChain tool can wrap the MCP call, so an agent uses the server like any other tool. The cell defines one and runs an agent over it (the agent itself is the subject of notebook 05).
+A LangChain tool can wrap the MCP call, so an agent uses the server like any other tool. The cell defines one and runs an agent over it. An agent is a model that chooses its own tool calls; notebook 05 is about agents.
 """),
     code('''
 from langchain_core.tools import tool
@@ -937,7 +1016,7 @@ print()
 w.show(w.final_text(result))
 '''),
     md("""
-The program's [Data360 MCP server](https://github.com/worldbank/data360-mcp) exposes search, metadata, and data tools over the World Bank's data platform in the same way, at a public endpoint. The cell lists its tools and runs one search; it is guarded because the session must not depend on the network.
+**Optional.** The program's [Data360 MCP server](https://github.com/worldbank/data360-mcp) offers search, metadata and data tools over the World Bank's data platform in the same way, at a public address. The cell lists its tools and runs one search. It needs the internet and a live server, so the list can differ from run to run, and if the call fails the cell says so and the notebook carries on.
 """),
     code('''
 try:
@@ -953,15 +1032,18 @@ except Exception as e:
     md("""
 ## Key points
 
-- Numbers come from a tool over authoritative data; the model's memory is for language.
-- A tool is a function with a description the model can read. The model fills the parameters; the application runs the function and returns the result.
-- Absence of data is a tool result the application can test for.
-- A schema turns the answer into a contract: validated on the way in, readable by other software on the way out.
-- MCP exposes the same tool to any client; FastMCP makes a server out of a function.
+- Numbers come from a tool over authoritative data, and the model's memory is for language. In this notebook the search found two of the four figures the main question needs, and the tool returned all four.
+- A tool is a function with a description the model can read and a form the model fills in. The model does not run it: the application does, and hands the result back.
+- Absence of data is a tool result that the application can test for, instead of a gap the model fills with a guess.
+- A schema turns the answer into a contract: checked on the way in, and readable by other software on the way out.
+- MCP is the standard plug: the same tool, written once as a server, is available to any program that speaks it.
 
 ## Exercise
 
-Add a `get_population` tool to `indicator_server.py` (series `SP.POP.TOTL`) and ask the agent "How many people in Rwanda used the internet in 2024?". The answer needs two tool calls and a calculation; check whether the model does the arithmetic or asks for a tool to do it.
+1. In section 1, change `k=4` to `k=8` and run the cell. How many of the four figures does the search find now, and what does the extra search cost in passages? Does the tool's column change?
+2. The data holds population too, series `SP.POP.TOTL`. Run `w.indicator_lookup("SP.POP.TOTL", "Rwanda", start=2024, end=2024)` and `w.indicator_lookup("IT.NET.USER.ZS", "Rwanda", start=2024, end=2024)`, and work out how many people in Rwanda used the internet in 2024. An answer like that needs two tool results and a calculation: should the model do the arithmetic, or should the application?
+3. Run `w.indicator_lookup("IT.NET.USER.ZS", "Kenya", start=2024, end=2025)`. The tool returns the year that exists and says nothing about the one that does not. Why does the instruction "if the tool returns no observation for the year asked, say so" matter for a result like this?
+4. In section 5, damage a different field of the answer, for example replace a value with the word "high", and read the error. Which field does it name?
 """),
     md(LINKS),
 ]
