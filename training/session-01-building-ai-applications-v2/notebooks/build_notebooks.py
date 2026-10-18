@@ -544,11 +544,11 @@ NB03 = [
     md("""
 # 03 · Retrieval-augmented generation
 
-**Session 01 · notebook 3 of 6**
+**Session 01 · Building AI applications for research and data · notebook 3 of 6**
 
 ## Objective
 
-Connect the vector store to the model: retrieve the passages that match the question and supply them as context. See two retrieval failures, their fixes, and why retrieval and generation are evaluated separately.
+Notebook 02 built the vector store and left two things open: a search for the latest figures puts the 2016 summary first, and nothing yet uses the date. This notebook puts the store to work. The application searches it for the chunks closest to a question, gives them to the model as context, and the model answers from them. A chunk that the search returns and the model reads is called a passage. Then the notebook shows three ways this goes wrong, and what fixes each.
 
 ## The application after this notebook
 
@@ -556,9 +556,26 @@ Connect the vector store to the model: retrieve the passages that match the ques
 
 The retriever and the passages it returns are what this notebook adds.
 
-The chain is written in LangChain's expression language: a retrieval step feeding a prompt feeding the model.
+## What you will see
+
+Four short scenes:
+
+1. The question from notebook 01 answered from the store. The answer cites its passages, but half of the question goes unanswered.
+2. Why the economy briefs never reached the model, and a fix that searches once for each part of the question.
+3. The 2016 summary outranking the 2026 briefs, and the date from notebook 02 removing it.
+4. A question the collection cannot answer still gets passages, and how to test a search without calling the model.
+
+## How to run it
+
+Run the cells in order. The model's answers are recorded ones, labelled `[recorded output: ...]`, as in notebook 01. The searches, rankings and tables are computed when you run the cell.
+"""),
+    md("""
+The next cell installs the session's tools and loads its helper module. It takes about a minute the first time, and you do not need to read it.
 """),
     code(SETUP),
+    md("""
+The next cell builds the same store as notebook 02, in three lines, and sets up the application: the instructions, a prompt, and two functions, one that searches the store and asks the model, and one that only searches. `k` is the number of passages a search returns; the model reads only those.
+"""),
     code('''
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
@@ -566,7 +583,7 @@ from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 docs = w.load_documents()
 chunks = w.split_sections(docs)
 store = w.build_store(chunks)
-print(len(chunks), "chunks in the store")
+print(len(chunks), "chunks in the store, the same collection as in notebook 02")
 
 INSTRUCTIONS = """You are a research assistant for development data.
 Answer only from the supplied passages. After each figure, cite the passage in the square-bracket form given.
@@ -585,9 +602,9 @@ def hits(question, k=4, where=None):
     return store.similarity_search_with_score(question, k=k, filter=where)
 '''),
     md("""
-## 1. The worked example through the pipeline
+## 1. The question from notebook 01, answered from the store
 
-Retrieve, then answer. The hits are printed first so that the evidence the model saw is visible.
+The search returns the four chunks closest to the question, and they become the passages the model reads. The cell prints them first, so that the evidence the model saw is visible, then the model's answer.
 """),
     code('''
 w.print_hits(hits(w.MAIN_QUESTION, k=4))
@@ -596,11 +613,24 @@ w.use("nb03_rag_main")
 w.show(make_rag(k=4).invoke(w.MAIN_QUESTION))
 '''),
     md("""
-## 2. A retrieval failure: a question with two parts
+The answer cites its passages, and it is honest: it says the passages hold no figures on GDP or growth, so half of the question cannot be answered. The briefs with those figures are in the store. Why did they not come back?
 
-The question asks about internet access and economic development. One query embeds both, and the internet passages win every slot: the economy briefs are absent from the top four, and the model says that half of the question cannot be answered. The 2016 summary also ranks high, for a reason the next failure makes explicit.
+## 2. Why half the question was lost
 
-The fix is on the retrieval side: ask the store two questions and merge the passages. (LangChain's `MultiQueryRetriever` does this with a model generating the sub-queries; here the two are written by hand so the mechanism is visible.)
+The question asks about internet access and economic development. The search compares the whole question with every chunk, and keeps the four closest. The cell ranks the chunks for the question, coloured by topic, with a line after the first four, the ones that go to the model.
+"""),
+    code('''
+topic = {"kenya-digital": "internet", "rwanda-digital": "internet", "regional-2016": "internet", "internet-indicator": "internet",
+         "kenya-economy": "economy", "rwanda-economy": "economy", "coffee": "other", "mobile-money": "other"}
+legend = {"internet": ("internet use", "#2f5f9e"), "economy": ("economy", "#d9822b"), "other": ("other topics", "#8a94a3")}
+
+ranked = hits(w.MAIN_QUESTION, k=10)
+w.show_ranking([(w.citation(d), score, topic[d.metadata["id"]]) for d, score in ranked], k=4, legend=legend, question=w.MAIN_QUESTION)
+'''),
+    md("""
+The top four are three internet chunks, one of them the 2016 summary, and the note on mobile money. The first economy chunk comes fifth, just below the line (0.570 against 0.591), and the one with Kenya's GDP per capita comes ninth. The search does not know that the question has two halves: it ranks chunks by their closeness to the whole question. Raising the number of passages would help only by taking in more of the collection. It takes nine to reach Kenya's GDP per capita, along with the coffee note and others, and every passage costs, as notebook 01 showed.
+
+The fix is on the search side: search once for each part of the question and merge the passages. Libraries can have a model write the sub-queries; here the two are written by hand so that the mechanism is visible.
 """),
     code('''
 sub_queries = ["internet use in Kenya and Rwanda, recent figures", "GDP per capita and economic growth in Kenya and Rwanda, recent figures"]
@@ -615,9 +645,11 @@ w.use("nb03_rag_two_queries")
 w.show((prompt | model).invoke({"context": w.format_context(merged), "question": w.MAIN_QUESTION}))
 '''),
     md("""
-## 3. A retrieval failure: outdated evidence
+Both halves of the question now have passages, and the answer covers both.
 
-"What are the latest available figures for internet use in Kenya and Rwanda?" The 2016 summary contains the words "latest available figures" and ranks first. With two passages supplied, the Kenya figure comes from the 2016 summary (a 2015 value) and the Rwanda figure from a 2026 brief (a 2024 value), and the model reports both faithfully.
+## 3. The 2016 summary outranks the briefs
+
+Notebook 02 ended with the 2016 summary ranking first. Here is what that costs. The question is "What are the latest available figures for internet use in Kenya and Rwanda?", and the 2016 summary contains the words "latest available figures". With two passages supplied, the Kenya figure comes from the 2016 summary (a 2015 value) and the Rwanda figure from a 2026 brief (a 2024 value), and the model reports both faithfully.
 """),
     code('''
 q = "What are the latest available figures for internet use in Kenya and Rwanda?"
@@ -629,30 +661,43 @@ w.show(make_rag(k=2).invoke(q))
     md("""
 The answer is faithful to its evidence and wrong for the reader: a 2015 figure presented as the latest. Nothing in the generation step can fix this; the evidence was selected badly.
 
-## 4. The fix is on the retrieval side
+## 4. The date filter
 
-Three options:
-
-1. **A metadata filter**: exclude documents dated before 2020 for a question about the latest figures. `InMemoryVectorStore` takes a filter function over the document metadata.
-2. **Query reformulation**: search for what the passage would say ("internet use 2024 percent of population"). It helps in many cases and fails in this one, as the cell shows: the 2016 summary still ranks first, because its wording is close to any query about figures.
-3. **Re-ranking by date** after retrieval, when the store has no filter.
-
-The filter is the reliable fix here, because the date is metadata the embedding does not see.
+Notebook 02 kept each document's date as metadata, for this moment. A filter tells the search to ignore documents dated before 2020. The cell compares the same search without and with the filter, and marks which of the two figures the question needs turn up.
 """),
     code('''
 since_2020 = lambda d: str(d.metadata.get("date", "")) >= "2020"
-print("1. metadata filter (date >= 2020):")
-w.print_hits(hits(q, k=2, where=since_2020))
-print("\\n2. reformulated query:")
-w.print_hits(hits("Kenya and Rwanda internet use 2024, percent of population", k=2))
-print()
+expected = next(item for item in w.load_questions() if item["id"] == "q8")["expected_numbers"]
+countries = {"KEN": "Kenya", "RWA": "Rwanda"}
+checks = [f"{countries[e['country']]}, {e['year']}: {e['value']}" for e in expected]
+
+
+def search(title, tone, where=None):
+    found = store.similarity_search(q, k=2, filter=where)
+    text = " ".join(h.page_content for h in found)
+    return {"title": title, "tone": tone, "hits": [(w.citation(h), h.page_content) for h in found],
+            "found": [w.numbers_present(text, [e])[0] == 1 for e in expected]}
+
+
+w.show_search_comparison(q, [search("No filter", "bad"), search("Date filter: 2020 or later", "good", since_2020)], checks)
+'''),
+    md("""
+With the filter, the 2016 summary is gone and both figures come back. The model's answer from the filtered passages:
+"""),
+    code('''
 w.use("nb03_rag_filtered")
 w.show(make_rag(k=2, where=since_2020).invoke(q))
 '''),
     md("""
-## 5. Retrieval always returns something
+Two other ideas, for comparison. Rewording the question to look like the passage often helps, but not here: the cell below shows that the 2016 summary still ranks first, because its wording is close to any question about figures. A third option, sorting the results by date after the search, does the same job as the filter when a store has none; it is not shown here. The filter works where rewording does not because the date is metadata, which the embedding does not see.
+"""),
+    code('''
+w.print_hits(hits("Kenya and Rwanda internet use 2024, percent of population", k=2))
+'''),
+    md("""
+## 5. A question outside the collection
 
-A question outside the collection still gets top-k passages, ranked by whatever is least unlike it. Compare a question the collection can answer with one it cannot.
+A search always returns the closest chunks, even when none of them is close. Compare a question the collection can answer with one it cannot. The score shows how close a passage is to the question: higher is closer.
 """),
     code('''
 for q2 in ["What is the population of Rwanda?", "What was inflation in Uganda in 2023?"]:
@@ -661,33 +706,42 @@ for q2 in ["What is the population of Rwanda?", "What was inflation in Uganda in
     print()
 '''),
     md("""
-Both questions get three passages with a score. The out-of-collection question scores lower, and a threshold could separate the two here, but a threshold has to be set from examples on the embedding model in use, which is part of the evaluation in notebook 06. The second safeguard is the instruction that tells the model to say when the passages do not answer the question, which notebook 01 introduced. Applications use both.
+Both questions get three passages. The scores are lower for the question outside the collection, and a cut-off score could separate the two here, but a cut-off has to be set from examples on the embedding model in use. The second safeguard is the instruction from notebook 01 that tells the model to say when the passages do not answer the question; notebook 05 shows it at work. Applications use both.
 
-## 6. Retrieval and generation are evaluated separately
+## 6. Testing the search without the model
 
-Retrieval can be tested without calling a model: for each evaluation question, did the top-k passages include a passage from the expected document? The cell runs that test for all eight questions at two values of k.
+A search can be tested before any model is involved. For each of the eight evaluation questions, the cell makes two checks: did the passages include the expected document, and do they contain the numbers an answer needs? `K` is the number of passages the search returns.
 """),
     code('''
-questions = w.load_questions()
-print(f"{'id':4s} {'category':18s} {'k=2':6s} {'k=4':6s} expected documents")
-for qd in questions:
-    r2 = w.retrieval_hit(store.similarity_search(qd["question"], k=2), qd["expected_documents"])
-    r4 = w.retrieval_hit(store.similarity_search(qd["question"], k=4), qd["expected_documents"])
-    print(f"{qd['id']:4s} {qd['category']:18s} {'hit' if r2 else 'miss':6s} {'hit' if r4 else 'miss':6s} {', '.join(qd['expected_documents'])}")
+K = 4   # passages returned by the search: try 2, then 8
+
+rows = []
+for item in w.load_questions():
+    passages = store.similarity_search(item["question"], k=K)
+    text = " ".join(p.page_content for p in passages)
+    needed = item.get("expected_numbers", [])
+    found = sum(w.numbers_present(text, [n])[0] for n in needed)
+    rows.append((item["id"], item["category"],
+                 "hit" if w.retrieval_hit(passages, item["expected_documents"]) else "miss",
+                 f"{found}/{len(needed)}" if needed else "none needed"))
+w.show_table(["id", "category", "expected document", "needed numbers"], rows, source=f"The search returns {K} passages per question.")
 '''),
     md("""
-A miss here is a retrieval problem, fixed by chunking, metadata, ranking, or the query. A wrong answer with a hit is a generation problem, fixed by instructions or a different model. Mixing the two makes both impossible to improve.
-
+Question q1, the main question, passes the first check and fails the second at `K = 4`: documents of the right kind came back, but only two of the four numbers the answer needs. That is a retrieval problem, and no instruction to the model can fix it. When both checks pass and the answer is still wrong, the fault is in the generation: the instructions or the model, which notebook 06 measures. Keeping the two apart is what makes each one possible to improve.
+"""),
+    md("""
 ## Key points
 
-- Retrieval selects the evidence; the model writes from it. A faithful answer to the wrong evidence is wrong.
-- Fixes for retrieval live in metadata, ranking, and query formulation. The model cannot repair a bad selection.
-- Retrieval always returns something; a threshold set from examples and an instruction to say "no evidence" are the two safeguards.
-- Test retrieval on its own, with expected documents per question.
+- Retrieval-augmented generation: search the store for the chunks closest to the question, give them to the model as passages, and have it answer from them, citing each.
+- What the search returns decides what the answer can say. For the main question the economy chunks ranked just below the line and never reached the model; searching once for each part of the question fixed it.
+- A search matches meaning, not age. The 2016 summary outranked the 2026 briefs, and rewording the question did not help; the date kept as metadata, used as a filter, did.
+- A search always returns something, even for a question the collection cannot answer. Two safeguards: a cut-off score set from examples, and an instruction telling the model to say when the passages do not answer.
+- A search can be tested without the model: check that the right documents and the needed numbers are among the passages. A miss there cannot be fixed by changing the instructions.
 
 ## Exercise
 
-Change `w.split_sections` to `w.split_fixed` in the first cell and rerun section 6. Count the misses. Then try k=8.
+1. Look at the ranking in section 2. Which chunk takes fourth place, and is it a good use of one of the four slots?
+2. In the cell of section 6, set `K` to `2`, run it, then set it to `8` and run it again. Which questions lose numbers at 2, and which gain at 8? At 8, does every question find all the numbers it needs?
 """),
     md(LINKS),
 ]

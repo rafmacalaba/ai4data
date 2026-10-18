@@ -43,9 +43,11 @@ from pcn_core import Claim, compare_by_policy
 from visuals import (  # noqa: F401  (the tables and views the notebooks draw)
     claim_check_html,
     prompt_html,
+    ranking_html,
     search_comparison_html,
     show_claim_check,
     show_prompt,
+    show_ranking,
     show_search_comparison,
     show_table,
     table_html,

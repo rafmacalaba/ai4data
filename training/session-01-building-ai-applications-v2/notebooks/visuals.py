@@ -5,6 +5,7 @@ workshop.py imports these functions, so notebook 01 calls them as w.show_claim_c
     table_html(headers, rows)  a small table, drawn as a light card
     claim_check_html(rows)   a table of what the model said against what the data says
     show_claim_check(rows)   the same, displayed
+    ranking_html(rows, k, legend)  search results as a ranked list of bars, with a line after the first k
     search_comparison_html(question, columns, checks)  one search on two versions of a collection, side by side
     prompt_html(messages)    the messages of one call, colour-coded: instructions, context, question
     show_prompt(messages)    the same, displayed
@@ -54,9 +55,17 @@ def table_html(headers, rows, source=""):
     def align(text):
         return "right" if re.fullmatch(r"[0-9,.-]+", str(text)) else "left"
 
+    def mark(text):
+        """Green for a hit or a full count, red for a miss or a short count; nothing for other cells."""
+        text = str(text)
+        count = re.fullmatch(r"(\d+)/(\d+)", text)
+        good = text == "hit" or (count and count.group(1) == count.group(2))
+        bad = text == "miss" or (count and count.group(1) != count.group(2))
+        return ";font-weight:600;color:" + ("#1f6b43" if good else "#8e2b21") if good or bad else ""
+
     head = "".join(f'<th style="padding:7px 12px;text-align:{"right" if i >= 2 else "left"}">{escape(str(h))}</th>' for i, h in enumerate(headers))
     body = "".join(
-        "<tr>" + "".join(f'<td style="{cell};text-align:{align(c)}">{escape(str(c))}</td>' for c in row) + "</tr>"
+        "<tr>" + "".join(f'<td style="{cell};text-align:{align(c)}{mark(c)}">{escape(str(c))}</td>' for c in row) + "</tr>"
         for row in rows
     )
     note = f'<p style="font:12.5px Helvetica,Arial,sans-serif;margin:8px 2px 2px;color:#6b7280">{escape(source)}</p>' if source else ""
@@ -72,6 +81,42 @@ def show_table(headers, rows, source=""):
 
 def show_claim_check(rows, source="none"):
     display(HTML(claim_check_html(rows, source)))
+
+
+def ranking_html(rows, k, legend, question=""):
+    """Search results as a ranked list of bars, with a line after the first k.
+
+    rows: [(label, score, kind), ...], best first. legend: {kind: (name, colour)}.
+    """
+    top = max(score for _, score, _ in rows)
+    key = "".join(
+        f'<span style="display:inline-block;margin-right:16px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;'
+        f'background:{colour};margin-right:5px;vertical-align:-1px"></span>{escape(name)}</span>'
+        for name, colour in legend.values()
+    )
+    lines = ""
+    for rank, (label, score, kind) in enumerate(rows, 1):
+        colour = legend[kind][1]
+        faded = "" if rank <= k else ";opacity:.4"
+        lines += (
+            f'<div style="display:flex;align-items:center;gap:10px;margin:3px 0">'
+            f'<div style="width:22px;text-align:right;font:12px Helvetica,Arial,sans-serif;color:#6b7280">{rank}</div>'
+            f'<div style="width:490px;flex:none;font:12.5px Menlo,Consolas,monospace;color:#16315a;white-space:nowrap{faded}">{escape(label)}</div>'
+            f'<div style="flex:1;background:#f3f4f6;border-radius:5px;height:18px"><div style="width:{score / top * 100:.1f}%;height:18px;'
+            f'background:{colour};border-radius:5px{faded}"></div></div>'
+            f'<div style="width:44px;font:600 12.5px Helvetica,Arial,sans-serif;color:#16315a">{score:.3f}</div></div>'
+        )
+        if rank == k:
+            lines += (
+                f'<div style="margin:6px 0 6px 32px;border-top:2px dashed #9a3a2f;color:#9a3a2f;font:600 12.5px Helvetica,Arial,sans-serif;padding-top:3px">'
+                f'only the top {k} go to the model</div>'
+            )
+    head = f'<div style="font:600 13.5px Helvetica,Arial,sans-serif;margin-bottom:6px">Question: {escape(question)}</div>' if question else ""
+    return f'<div style="{CARD}">{head}<div style="font:12.5px Helvetica,Arial,sans-serif;margin-bottom:8px;color:#374151">{key}</div>{lines}</div>'
+
+
+def show_ranking(rows, k, legend, question=""):
+    display(HTML(ranking_html(rows, k, legend, question)))
 
 
 def search_comparison_html(question, columns, checks):
