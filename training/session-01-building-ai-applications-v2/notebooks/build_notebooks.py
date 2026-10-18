@@ -681,9 +681,15 @@ w.show(make_rag(k=2).invoke(q))
     md("""
 The answer is faithful to its evidence and wrong for the reader: a 2015 figure presented as the latest. Nothing in the generation step can fix this; the evidence was selected badly.
 
-## 4. The date filter
+## 4. Three ideas for fixing outdated evidence
 
-Notebook 02 kept each document's date as metadata, for this moment. A filter tells the search to ignore documents dated before 2020. The cell compares the same search without and with the filter, and marks which of the two figures the question needs turn up.
+The fix is on the search side. Three ideas:
+
+1. **Filter on the date.** Tell the search to ignore documents dated before 2020. Notebook 02 kept each document's date as metadata, for this moment.
+2. **Reword the question** to look like the passage it should find, for example "internet use 2024, percent of population". It often helps, but not here.
+3. **Sort the results by date** after the search, when the store has no filter. It does the same job as the filter; it is not shown here.
+
+The notebook tries the first two. The first cell compares the same search without and with the date filter, and marks which of the two figures the question needs turn up.
 """),
     code('''
 since_2020 = lambda d: str(d.metadata.get("date", "")) >= "2020"
@@ -709,7 +715,7 @@ w.use("nb03_rag_filtered")
 w.show(make_rag(k=2, where=since_2020).invoke(q))
 '''),
     md("""
-Two other ideas, for comparison. Rewording the question to look like the passage often helps, but not here: the cell below shows that the 2016 summary still ranks first, because its wording is close to any question about figures. A third option, sorting the results by date after the search, does the same job as the filter when a store has none; it is not shown here. The filter works where rewording does not because the date is metadata, and the embedding (the list of numbers that stands for a chunk's meaning, from notebook 02) is made from the text alone, so it does not see the date.
+Now idea 2, rewording. The cell below searches for what the passage would say, and the 2016 summary still ranks first, because its wording is close to any question about figures. The filter works where rewording does not because the date is metadata, and the embedding (the list of numbers that stands for a chunk's meaning, from notebook 02) is made from the text alone, so it does not see the date.
 """),
     code('''
 w.print_hits(hits("Kenya and Rwanda internet use 2024, percent of population", k=2))
