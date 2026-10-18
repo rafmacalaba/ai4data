@@ -550,7 +550,7 @@ NB03 = [
 
 Notebook 02 built the vector store and left two things open: a search for the latest figures puts the 2016 summary first, and nothing yet uses the date. This notebook puts the store to work. The application searches it for the chunks closest to a question, gives them to the model as context, and the model answers from them. A chunk that the search returns and the model reads is called a passage.
 
-This pattern has a name: **retrieval-augmented generation**, or **RAG**. *Retrieval* is the search of the store, *augmented* means the search results are added to what the model is given, and *generation* is the model writing the answer. The rest of the series builds on it. This notebook builds it, then shows three ways it goes wrong, and what fixes each.
+This pattern has a name: **retrieval-augmented generation**, or **RAG**. *Retrieval* is the search of the store, *augmented* means the search results are added to what the model is given, and *generation* is the model writing the answer. RAG has two halves: notebook 02 prepared the collection, and this notebook uses it to answer. The rest of the series builds on it. This notebook builds the second half, then shows three ways it goes wrong, and what fixes each.
 
 ## The application after this notebook
 
@@ -576,7 +576,7 @@ The next cell installs the session's tools and loads its helper module. It takes
 """),
     code(SETUP),
     md("""
-The next cell builds the same store as notebook 02, in three lines, and sets up the application: the instructions, a prompt, and two functions, one that searches the store and asks the model, and one that only searches. `k` is the number of passages a search returns; the model reads only those.
+The next cell builds the same store as notebook 02, in three lines. Each Colab notebook starts with an empty session, so the store from notebook 02 is not there to reuse; the three lines rebuild it. The cell also sets up the application: the instructions, a prompt, and two functions, one that searches the store and asks the model, and one that only searches. `k` is the number of passages a search returns; the model reads only those.
 """),
     code('''
 from langchain_core.prompts import ChatPromptTemplate
@@ -630,9 +630,9 @@ ranked = hits(w.MAIN_QUESTION, k=10)
 w.show_ranking([(w.citation(d), score, topic[d.metadata["id"]]) for d, score in ranked], k=4, legend=legend, question=w.MAIN_QUESTION)
 '''),
     md("""
-The top four are three internet chunks, one of them the 2016 summary, and the note on mobile money. The first economy chunk comes fifth, just below the line (0.570 against 0.591), and the one with Kenya's GDP per capita comes ninth. The search does not know that the question has two halves: it ranks chunks by their closeness to the whole question. Raising the number of passages would help only by taking in more of the collection. It takes nine to reach Kenya's GDP per capita, along with the coffee note and others, and every passage costs, as notebook 01 showed.
+The top four are three internet chunks, one of them the 2016 summary, and the note on mobile money. The first economy chunk comes fifth, just below the line (0.570 against 0.591), and the one with Kenya's GDP per capita comes ninth. The search does not know that the question has two halves: it ranks chunks by their closeness to the whole question. Raising the number of passages is a poor fix: Kenya's GDP per capita appears only at nine passages, together with the coffee note and others, and every passage costs, as notebook 01 showed.
 
-The fix is on the search side: search once for each part of the question and merge the passages. Libraries can have a model write the sub-queries; here the two are written by hand so that the mechanism is visible.
+The fix is on the search side: search once for each part of the question and merge the passages. Libraries can have a model write the sub-queries; here the two are written by hand so that the mechanism is visible. The fix is not free: two searches of three chunks each give six passages, against four before, and the 2016 summary comes along with them. The model ignores it here, but section 3 shows what happens when it does not.
 """),
     code('''
 sub_queries = ["internet use in Kenya and Rwanda, recent figures", "GDP per capita and economic growth in Kenya and Rwanda, recent figures"]
@@ -712,7 +712,7 @@ Both questions get three passages. The scores are lower for the question outside
 
 ## 6. Testing the search without the model
 
-A search can be tested before any model is involved. This is the retrieval half of RAG on its own, and the model is the generation half. For each of the eight evaluation questions, the cell makes two checks: did the passages include the expected document, and do they contain the numbers an answer needs? `K` is the number of passages the search returns.
+A search can be tested before any model is involved. This is the retrieval half of RAG on its own, and the model is the generation half. For each of the eight evaluation questions, the cell makes two checks: did the passages include an expected document (one of them is enough), and do they contain the numbers an answer needs? `K` is the number of passages the search returns.
 """),
     code('''
 K = 4   # passages returned by the search: try 2, then 8
@@ -729,7 +729,7 @@ for item in w.load_questions():
 w.show_table(["id", "category", "expected document", "needed numbers"], rows, source=f"The search returns {K} passages per question.")
 '''),
     md("""
-Question q1, the main question, passes the first check and fails the second at `K = 4`: documents of the right kind came back, but only two of the four numbers the answer needs. That is a retrieval problem, and no instruction to the model can fix it. When both checks pass and the answer is still wrong, the fault is in the generation: the instructions or the model, which notebook 06 measures. Keeping the two apart is what makes each one possible to improve.
+Question q1, the main question, passes the first check, though only the two internet documents of its four expected ones came back, and fails the second at `K = 4`: documents of the right kind came back, but only two of the four numbers the answer needs. That is a retrieval problem, and no instruction to the model can fix it. When both checks pass and the answer is still wrong, the fault is in the generation: the instructions or the model, which notebook 06 measures. Keeping the two apart is what makes each one possible to improve.
 """),
     md("""
 ## Key points
@@ -744,6 +744,7 @@ Question q1, the main question, passes the first check and fails the second at `
 
 1. Look at the ranking in section 2. Which chunk takes fourth place, and is it a good use of one of the four slots?
 2. In the cell of section 6, set `K` to `2`, run it, then set it to `8` and run it again. Which questions lose numbers at 2, and which gain at 8? At 8, does every question find all the numbers it needs?
+3. Set `K` to `2` and look at q8, the question from section 3. Why does it pass at 4 and not at 2?
 """),
     md(LINKS),
 ]
