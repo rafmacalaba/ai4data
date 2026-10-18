@@ -634,9 +634,10 @@ w.show_ranking([(w.citation(d), score, topic[d.metadata["id"]]) for d, score in 
     md("""
 The top four are three internet chunks, one of them the 2016 summary, and the note on mobile money. The first economy chunk comes fifth, just below the line (0.570 against 0.591), and the one with Kenya's GDP per capita comes ninth. The search does not know that the question has two halves: it ranks chunks by their closeness to the whole question. Raising the number of passages is a poor fix: Kenya's GDP per capita appears only at nine passages, together with the coffee note and others, and every passage costs, as notebook 01 showed.
 
-The fix is on the search side: search once for each part of the question and merge the passages. Libraries can have a model write the sub-queries; here the two are written by hand so that the mechanism is visible. The cell shows the original search and the merged one side by side, and marks which of the four figures the question needs each of them brings back. The fix is not free: two searches of four chunks each give eight different passages, against four before, and the 2016 summary and the mobile-money note come along with them. The model ignores both here, but section 3 shows what happens when it does not.
+The fix is on the search side: **break the question down into its parts, search once for each part, and merge the passages.** This question has two parts, internet use and the economy, so it becomes two smaller questions. Libraries can have a model write these smaller questions; here the two are written by hand so that the mechanism is visible. The cell shows the original search and the merged one side by side, and marks which of the four figures the question needs each of them brings back. The fix is not free: two searches of four chunks each give eight different passages, against four before, and the 2016 summary and the mobile-money note come along with them. The model ignores both here, but section 3 shows what happens when it does not.
 """),
     code('''
+# the question broken into its two parts: one smaller question for each
 sub_queries = ["internet use in Kenya and Rwanda, recent figures", "GDP per capita and economic growth in Kenya and Rwanda, recent figures"]
 merged = []
 for q in sub_queries:
@@ -658,7 +659,7 @@ def column(title, tone, found):
 
 
 w.show_search_comparison(w.MAIN_QUESTION, [column("One search for the whole question: 4 passages", "bad", one_search),
-                                           column(f"One search for each part, merged: {len(merged)} passages", "good", merged)], checks)
+                                           column(f"The question broken into two, one search each, merged: {len(merged)} passages", "good", merged)], checks)
 print()
 w.use("nb03_rag_two_queries")
 w.show((prompt | model).invoke({"context": w.format_context(merged), "question": w.MAIN_QUESTION}))
@@ -752,7 +753,7 @@ Question q1, the main question, passes the first check, though only the two inte
 ## Key points
 
 - Retrieval-augmented generation (RAG), introduced at the top: search the store for the chunks closest to the question, give them to the model as passages, and have it answer from them, citing each.
-- What the search returns decides what the answer can say. For the main question the economy chunks ranked just below the line and never reached the model; searching once for each part of the question fixed it.
+- What the search returns decides what the answer can say. For the main question the economy chunks ranked just below the line and never reached the model; breaking the question into its parts and searching once for each fixed it.
 - A search matches meaning, not age. The 2016 summary outranked the 2026 briefs, and rewording the question did not help; the date kept as metadata, used as a filter, did.
 - A search always returns something, even for a question the collection cannot answer. Two safeguards: a cut-off score set from examples, and an instruction telling the model to say when the passages do not answer.
 - A search can be tested without the model: check that the right documents and the needed numbers are among the passages. A miss there cannot be fixed by changing the instructions.
