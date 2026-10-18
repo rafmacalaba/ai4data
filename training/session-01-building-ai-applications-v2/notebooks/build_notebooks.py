@@ -548,13 +548,15 @@ NB03 = [
 
 ## Objective
 
-Notebook 02 built the vector store and left two things open: a search for the latest figures puts the 2016 summary first, and nothing yet uses the date. This notebook puts the store to work. The application searches it for the chunks closest to a question, gives them to the model as context, and the model answers from them. A chunk that the search returns and the model reads is called a passage. Then the notebook shows three ways this goes wrong, and what fixes each.
+Notebook 02 built the vector store and left two things open: a search for the latest figures puts the 2016 summary first, and nothing yet uses the date. This notebook puts the store to work. The application searches it for the chunks closest to a question, gives them to the model as context, and the model answers from them. A chunk that the search returns and the model reads is called a passage.
+
+This pattern has a name: **retrieval-augmented generation**, or **RAG**. *Retrieval* is the search of the store, *augmented* means the search results are added to what the model is given, and *generation* is the model writing the answer. The rest of the series builds on it. This notebook builds it, then shows three ways it goes wrong, and what fixes each.
 
 ## The application after this notebook
 
 @@DIAGRAM:retrieval@@
 
-The retriever and the passages it returns are what this notebook adds.
+The search and the passages it returns are what this notebook adds: the RAG pattern.
 
 ## What you will see
 
@@ -593,7 +595,7 @@ prompt = ChatPromptTemplate.from_messages([("system", INSTRUCTIONS), ("human", "
 
 
 def make_rag(k=4, where=None):
-    """A RAG chain: question -> retrieved passages -> prompt -> model."""
+    """RAG (retrieval-augmented generation): search the store, put the passages in the prompt, ask the model."""
     retrieve = RunnableLambda(lambda q: store.similarity_search(q, k=k, filter=where))
     return {"context": retrieve | w.format_context, "question": RunnablePassthrough()} | prompt | model
 
@@ -689,7 +691,7 @@ w.use("nb03_rag_filtered")
 w.show(make_rag(k=2, where=since_2020).invoke(q))
 '''),
     md("""
-Two other ideas, for comparison. Rewording the question to look like the passage often helps, but not here: the cell below shows that the 2016 summary still ranks first, because its wording is close to any question about figures. A third option, sorting the results by date after the search, does the same job as the filter when a store has none; it is not shown here. The filter works where rewording does not because the date is metadata, which the embedding does not see.
+Two other ideas, for comparison. Rewording the question to look like the passage often helps, but not here: the cell below shows that the 2016 summary still ranks first, because its wording is close to any question about figures. A third option, sorting the results by date after the search, does the same job as the filter when a store has none; it is not shown here. The filter works where rewording does not because the date is metadata, and the embedding (the list of numbers that stands for a chunk's meaning, from notebook 02) is made from the text alone, so it does not see the date.
 """),
     code('''
 w.print_hits(hits("Kenya and Rwanda internet use 2024, percent of population", k=2))
@@ -710,7 +712,7 @@ Both questions get three passages. The scores are lower for the question outside
 
 ## 6. Testing the search without the model
 
-A search can be tested before any model is involved. For each of the eight evaluation questions, the cell makes two checks: did the passages include the expected document, and do they contain the numbers an answer needs? `K` is the number of passages the search returns.
+A search can be tested before any model is involved. This is the retrieval half of RAG on its own, and the model is the generation half. For each of the eight evaluation questions, the cell makes two checks: did the passages include the expected document, and do they contain the numbers an answer needs? `K` is the number of passages the search returns.
 """),
     code('''
 K = 4   # passages returned by the search: try 2, then 8
@@ -732,7 +734,7 @@ Question q1, the main question, passes the first check and fails the second at `
     md("""
 ## Key points
 
-- Retrieval-augmented generation: search the store for the chunks closest to the question, give them to the model as passages, and have it answer from them, citing each.
+- Retrieval-augmented generation (RAG), introduced at the top: search the store for the chunks closest to the question, give them to the model as passages, and have it answer from them, citing each.
 - What the search returns decides what the answer can say. For the main question the economy chunks ranked just below the line and never reached the model; searching once for each part of the question fixed it.
 - A search matches meaning, not age. The 2016 summary outranked the 2026 briefs, and rewording the question did not help; the date kept as metadata, used as a filter, did.
 - A search always returns something, even for a question the collection cannot answer. Two safeguards: a cut-off score set from examples, and an instruction telling the model to say when the passages do not answer.
