@@ -41,7 +41,7 @@ DASH = ' stroke-dasharray="5 4"'
 ALT = {
     "prompt": "Diagram: the question and the context feed the prompt, which goes to the model and produces the answer.",
     "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, built in notebook 03: the question and the retrieved passages from the vector store feed the prompt, then the model and the answer.",
-    "retrieval": "Diagram: the question goes to a search of the vector store, which returns the closest chunks as passages; the passages and the question go into the prompt, then the model and an answer with citations.",
+    "retrieval": "Diagram: the question goes to retrieval, a search of the vector store that returns the closest chunks as passages; the passages and the question go into the prompt, then to generation, where the model writes an answer with citations.",
     "tools": "Diagram: the question goes to the model, which calls the tool get_indicator with an indicator, a country and optional start and end years, and receives data that returns to the model, which answers with text or an object that matches a schema. Separately, the same tool is served over MCP to any MCP client, such as this notebook, a chatbot or a desktop assistant.",
     "agent": "Diagram: the question goes to the model, which calls search_documents with a query, getting passages, or get_indicator with an indicator, a country and optional start and end years, getting data; the results return to the model, which answers. The tools run in a fixed order in a chain, or are chosen by the model, with a recursion limit and a trace.",
     "verification": "Diagram: the question goes to an agent with tools, which produces an answer with claim tags; pcn-core marks each number as verified, flagged or unmarked. Separately, the evaluation suite produces a table per question.",
@@ -94,10 +94,10 @@ def flow(name: str, stage: int | None = None) -> Flow:
         return Flow(
             [
                 ("q", "question", "normal"),
-                ("r", "search\nthe store", "hot"),
+                ("r", "retrieval\n(search the store)", "hot"),
                 ("p", "passages\n(chunks found)", "hot"),
                 ("pr", "prompt\ninstructions + passages\n+ question", "normal"),
-                ("m", "model", "normal"),
+                ("m", "generation\n(the model writes)", "normal"),
                 ("a", "answer\nwith citations", "normal"),
             ],
             [("q", "r"), ("r", "p"), ("p", "pr"), ("q", "pr", "below"), ("pr", "m"), ("m", "a")],

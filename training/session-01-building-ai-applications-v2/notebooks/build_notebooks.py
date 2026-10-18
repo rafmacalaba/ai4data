@@ -556,7 +556,7 @@ This pattern has a name: **retrieval-augmented generation**, or **RAG**. *Retrie
 
 @@DIAGRAM:retrieval@@
 
-The search and the passages it returns are what this notebook adds: the RAG pattern.
+Retrieval (the search) and the passages it returns are what this notebook adds, and the model's step becomes generation: together, the RAG pattern.
 
 ## What you will see
 
