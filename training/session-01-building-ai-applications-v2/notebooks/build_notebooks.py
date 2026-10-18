@@ -634,22 +634,37 @@ w.show_ranking([(w.citation(d), score, topic[d.metadata["id"]]) for d, score in 
     md("""
 The top four are three internet chunks, one of them the 2016 summary, and the note on mobile money. The first economy chunk comes fifth, just below the line (0.570 against 0.591), and the one with Kenya's GDP per capita comes ninth. The search does not know that the question has two halves: it ranks chunks by their closeness to the whole question. Raising the number of passages is a poor fix: Kenya's GDP per capita appears only at nine passages, together with the coffee note and others, and every passage costs, as notebook 01 showed.
 
-The fix is on the search side: search once for each part of the question and merge the passages. Libraries can have a model write the sub-queries; here the two are written by hand so that the mechanism is visible. The fix is not free: two searches of three chunks each give six passages, against four before, and the 2016 summary comes along with them. The model ignores it here, but section 3 shows what happens when it does not.
+The fix is on the search side: search once for each part of the question and merge the passages. Libraries can have a model write the sub-queries; here the two are written by hand so that the mechanism is visible. The cell shows the original search and the merged one side by side, and marks which of the four figures the question needs each of them brings back. The fix is not free: two searches of four chunks each give eight different passages, against four before, and the 2016 summary and the mobile-money note come along with them. The model ignores both here, but section 3 shows what happens when it does not.
 """),
     code('''
 sub_queries = ["internet use in Kenya and Rwanda, recent figures", "GDP per capita and economic growth in Kenya and Rwanda, recent figures"]
 merged = []
 for q in sub_queries:
-    for d in store.similarity_search(q, k=3):
+    for d in store.similarity_search(q, k=4):
         if d not in merged:
             merged.append(d)
-w.print_hits(merged)
+
+one_search = [d for d, _ in hits(w.MAIN_QUESTION, k=4)]
+needed = next(item for item in w.load_questions() if item["id"] == "q1")["expected_numbers"]
+countries = {"KEN": "Kenya", "RWA": "Rwanda"}
+names = {"IT.NET.USER.ZS": "internet use", "NY.GDP.PCAP.CD": "GDP per capita"}
+checks = [f"{countries[n['country']]} {names[n['indicator']]}, {n['year']}: {n['value']:,}" for n in needed]
+
+
+def column(title, tone, found):
+    text = " ".join(d.page_content for d in found)
+    return {"title": title, "tone": tone, "hits": [(w.citation(d), d.page_content) for d in found],
+            "found": [w.numbers_present(text, [n])[0] == 1 for n in needed]}
+
+
+w.show_search_comparison(w.MAIN_QUESTION, [column("One search for the whole question: 4 passages", "bad", one_search),
+                                           column(f"One search for each part, merged: {len(merged)} passages", "good", merged)], checks)
 print()
 w.use("nb03_rag_two_queries")
 w.show((prompt | model).invoke({"context": w.format_context(merged), "question": w.MAIN_QUESTION}))
 '''),
     md("""
-Both halves of the question now have passages, and the answer covers both.
+The merged passages bring back all four figures, where the single search brought two, and the answer covers both halves of the question.
 
 ## 3. The 2016 summary outranks the briefs
 
