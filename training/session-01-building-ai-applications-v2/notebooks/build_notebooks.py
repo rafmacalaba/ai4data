@@ -1146,7 +1146,7 @@ The application can now answer the main question with a fixed set of steps. It i
 
 ## 2. An agent: the model chooses the steps
 
-In an agent, the model is offered the tools and their descriptions, and chooses. `create_agent` builds the loop with LangGraph: the model replies with the calls it wants, the loop runs them, the results go back to the model, and the loop stops when the model answers in text. The cell asks the same question, then shows the trace as a table, one row per call.
+In an agent, the model is offered the tools and their descriptions, and chooses. `create_agent` builds the loop with LangGraph: the model replies with the calls it wants, the loop runs them, the results go back to the model, and the loop stops when the model answers in text. The cell asks the same question, then shows the trace as a table, one row per call, grouped by round.
 """),
     code('''
 agent = create_agent(model, tools, system_prompt=INSTRUCTIONS)
@@ -1158,7 +1158,7 @@ print()
 w.show(w.final_text(result))
 '''),
     md("""
-The model chose the same five calls that the workflow made, all in one step. On a different question it would choose differently. That is the point of an agent, and also its risk: the calls are not known in advance. The application can now let the model choose between its tools.
+The model chose the same five calls that the workflow made. The first column is the round: one message from the model, which can ask for several tools at once. Here it asked for all five in its first message, so they share round 1; in section 4, a call that fails takes a second round to correct. On a different question the model would choose differently. That is the point of an agent, and also its risk: the calls are not known in advance. The application can now let the model choose between its tools.
 
 ## 3. A question the tools cannot answer
 
@@ -1186,7 +1186,7 @@ print()
 w.show(w.final_text(result))
 '''),
     md("""
-The first row is the failed call, the second the retry that worked. The application can now recover from a wrong call, as long as its tools return errors that the model can read.
+The first row is the failed call, in round 1; the second is the retry that worked, in round 2. The application can now recover from a wrong call, as long as its tools return errors that the model can read.
 
 ## 5. A loop that never ends
 

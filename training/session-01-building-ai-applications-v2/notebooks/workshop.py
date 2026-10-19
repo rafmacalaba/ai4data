@@ -435,7 +435,7 @@ def print_trace(result: dict[str, Any], width: int = 150) -> None:
 
 
 def show_trace(result: dict[str, Any]) -> None:
-    """The tool calls of an agent run as a table: the step, the tool, what was asked, and what came back."""
+    """The tool calls of an agent run as a table: the round (one message of the model, which may ask for several tools at once), the call, the tool, what was asked, and what came back."""
     answers = {m.tool_call_id: m for m in result["messages"] if isinstance(m, ToolMessage)}
 
     def came_back(m: ToolMessage) -> str:
@@ -450,14 +450,15 @@ def show_trace(result: dict[str, Any]) -> None:
         obs = r.get("observations", [])
         return f"{len(obs)} observations, {obs[0]['year']} to {obs[-1]['year']}, latest {obs[-1]['value']:,.1f}" if obs else "no observations"
 
-    rows, step = [], 0
+    rows, rnd, call = [], 0, 0
     for m in result["messages"]:
         if isinstance(m, AIMessage) and m.tool_calls:
-            step += 1
+            rnd += 1
             for c in m.tool_calls:
+                call += 1
                 asked = ", ".join(f"{k}={v}" for k, v in c["args"].items())
-                rows.append((step, c["name"], asked, came_back(answers[c["id"]]) if c["id"] in answers else ""))
-    show_table(["step", "tool", "what was asked", "what came back"], rows)
+                rows.append((rnd, call, c["name"], asked, came_back(answers[c["id"]]) if c["id"] in answers else ""))
+    show_table(["round", "call", "tool", "what was asked", "what came back"], rows)
 
 
 def tool_results(result: dict[str, Any], name: str) -> list[dict[str, Any]]:
