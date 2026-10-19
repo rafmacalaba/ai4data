@@ -557,6 +557,43 @@ def workflows_svg():
     return "".join(p)
 
 
+def claimtag_svg():
+    """Static picture: the parts of a claim tag, and how the verifier compares the number with its record."""
+    W, H, CW = 1000, 400, 9.0   # CW: width of one character of the code font at 15px
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+         f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
+         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">A claim tag: a number that says where it came from</text>']
+    parts = [("<claim ", None, ""), ('id="IT.NET.USER.ZS:KEN:2024"', "#2f5f9e", "id"), (" ", None, ""), ('policy="rounded" decimals="1"', "#d9822b", "policy"),
+             (">", None, ""), ("35.0", "#2f8f5b", "num"), ("</claim>", None, "")]
+    x, y, centres = 40, 92, {}
+    for text, col, key in parts:
+        w = len(text) * CW
+        if col:
+            p.append(f'<rect x="{x - 1}" y="{y - 19}" width="{w + 2}" height="28" rx="5" fill="{col}" fill-opacity="0.16" stroke="{col}"/>')
+            centres[key] = x + w / 2
+        p.append(f'<text x="{x}" y="{y}" font-size="15" font-family="{MONO}" fill="{INK}" xml:space="preserve">{escape(text)}</text>')
+        x += w
+    notes = {"id": ["which record it came from:", "indicator : country : year"], "policy": ["how to compare it:", "rounded to 1 decimal"], "num": ["the number a", "reader sees"]}
+    cols = {"id": "#2f5f9e", "policy": "#d9822b", "num": "#2f8f5b"}
+    for key, lines in notes.items():
+        cx = centres[key]
+        p.append(f'<line x1="{cx}" y1="{y + 11}" x2="{cx}" y2="140" stroke="{cols[key]}" stroke-width="1.6"/>')
+        for i, t in enumerate(lines):
+            p.append(f'<text x="{cx}" y="{158 + i * 17}" text-anchor="middle" font-size="12.5" fill="{cols[key]}" font-weight="{700 if i == 0 else 400}">{escape(t)}</text>')
+    p.append(f'<text x="24" y="238" font-size="14.5" font-weight="700" fill="{BLUE}">What the verifier does with it</text>')
+    boxes = [(24, "The record holds", "34.9762", PALE, BLUE), (366, "Rounded to 1 decimal", "35.0", PALE, BLUE), (708, "Equals the number shown", "verified", "#e4f3ea", "#2f8f5b")]
+    for bx, a, b, fill, col in boxes:
+        p.append(f'<rect x="{bx}" y="256" width="268" height="84" rx="10" fill="{fill}" stroke="{col}" stroke-width="1.8"/>'
+                 f'<text x="{bx + 134}" y="286" text-anchor="middle" font-size="13" fill="{GREY}">{escape(a)}</text>'
+                 f'<text x="{bx + 134}" y="320" text-anchor="middle" font-size="24" font-weight="700" fill="{col}">{escape(b)}</text>')
+    p.append(f'<line x1="294" y1="298" x2="364" y2="298" stroke="{BLUE}" stroke-width="2.2" marker-end="url(#ar)"/>')
+    p.append(f'<line x1="636" y1="298" x2="706" y2="298" stroke="{BLUE}" stroke-width="2.2" marker-end="url(#ar)"/>')
+    p.append(f'<text x="24" y="372" font-size="13" fill="{GREY}">If the rounded record differed from the number shown, the mark would be flagged. With no tag at all, the number is unmarked.</text>')
+    p.append("</svg>")
+    return "".join(p)
+
+
 ALT = {
     "chunking": "Animation: the same Kenya brief cut two ways. Fixed 400-character windows end on a stranded heading and mix two sections; section chunks keep each heading with its paragraph.",
     "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
@@ -565,6 +602,7 @@ ALT = {
     "metadata": "Diagram: one document in two parts. Its metadata, the header of the file, holds the date 2016-06-01; its text sounds current and ends 'The latest available figures are for 2015.' An application can filter and rank on the date field, but it does not read the text for age.",
     "toolloop": "Animation: the application sends the model the question and the list of tools; the model replies with a request for get_indicator with GDP per capita, Rwanda and 2023; the application runs the tool, which returns 1,061 with its source; the application hands that back and the model answers that it was 1,061 US dollars in 2023.",
     "workflows": "Diagram: in a workflow the order of the calls is written in code: search the documents, look up the four series, the model writes the answer, the same on every run. In an agent the model decides the next step: it asks for search_documents or get_indicator, gets the result back, and answers in text when it has enough; a step limit stops a loop that never ends and a trace lists every call.",
+    "claimtag": "Diagram: a claim tag wraps a number and carries the claim_id, which names the indicator, the country and the year, and a policy that says how to compare, here rounded to one decimal. The verifier takes the record, 34.9762, rounds it to one decimal, gets 35.0, finds it equal to the number shown, and marks it verified.",
     "desk": "Diagram: the four briefs of this notebook, about 1,024 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 

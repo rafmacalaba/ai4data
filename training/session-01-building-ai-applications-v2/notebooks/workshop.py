@@ -525,6 +525,13 @@ def print_checks(checks: list[ClaimCheck]) -> None:
     print(f"\n{counts['verified']} verified, {counts['flagged']} flagged, {counts['unmarked']} unmarked")
 
 
+def show_checks(checks: list[ClaimCheck]) -> None:
+    """The verifier's marks as a table: each number, the record it names, what the record holds, and the mark."""
+    rows = [(c.text, c.claim_id or "no tag", c.detail.replace("record holds ", "").replace("no claim tag, so no mark is drawn", "none"), c.status) for c in checks]
+    counts = {s: sum(c.status == s for c in checks) for s in ("verified", "flagged", "unmarked")}
+    show_table(["number", "claim_id", "the record holds", "mark"], rows, source=f"{counts['verified']} verified, {counts['flagged']} flagged, {counts['unmarked']} unmarked")
+
+
 def strip_claims(answer: str) -> str:
     """The answer as a reader sees it, tags removed."""
     return CLAIM_RE.sub(lambda m: m.group(4).strip(), answer)
@@ -573,6 +580,12 @@ class EvalRow:
     cited: str
     verification: str
     note: str = ""
+
+
+def show_eval(rows: list[EvalRow]) -> None:
+    """The evaluation table: one row per question."""
+    show_table(["id", "category", "retrieval", "numbers", "cited", "verified / flagged / unmarked"],
+               [(r.id, r.category, r.retrieval, r.numbers, r.cited, r.verification) for r in rows])
 
 
 def print_table(rows: list[EvalRow]) -> None:

@@ -93,6 +93,7 @@ def explainer_md(name: str) -> str:
         "metadata": explainers.metadata_svg,
         "toolloop": explainers.toolloop_svg,
         "workflows": explainers.workflows_svg,
+        "claimtag": explainers.claimtag_svg,
     }[name]()
     return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
 
@@ -1288,15 +1289,24 @@ NB06 = [
     md("""
 # 06 · Making the application trustworthy
 
-**Session 01 · notebook 6 of 6**
+**Session 01 · Building AI applications for research and data · notebook 6 of 6**
 
 ## Objective
 
-Add verification of every number in an answer, with the program's `pcn-core` package, and an evaluation suite that runs the application over a set of questions with known evidence. Compare two configurations of the application on the same suite.
+Notebook 05 ended on a problem. The answer of the main question holds several numbers, and a check by value cannot tell which come from a source: it matched "28" to a value that merely happened to be 28.0, and found nothing for "80". The cause was that the answer never said which record each number came from.
 
-## The checks
+This notebook fixes that. The model is asked to label each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
 
-| Check | Question it answers | Where it runs |
+Four terms, in plain words:
+
+- A **claim tag** is a label that the model writes around a number: it names the record the number comes from, and how exactly to compare the two. The tag is the `claim_id` of notebook 05 with a little more.
+- A **verifier** reads the tags and checks each number against its record. The one here is `pcn-core`, the Python core of the program's Proof-Carrying Numbers (PCN). Each number gets a mark: **verified** (it matches its record), **flagged** (it does not) or **unmarked** (it has no tag, so there is nothing to check it against).
+- An **evaluation suite** is a fixed list of questions, each with the evidence and the behaviour that a good answer needs. The application runs on every question, and a table shows how it did.
+- A **configuration** is one version of the application. The suite compares two.
+
+Four kinds of check, and where each has appeared:
+
+| Check | Question it answers | Where |
 |---|---|---|
 | Retrieval | Did the application find the right evidence? | Notebook 03, section 6 |
 | Grounding | Is the answer written from that evidence? | Citations in the answer |
@@ -1307,7 +1317,19 @@ Add verification of every number in an answer, with the program's `pcn-core` pac
 
 @@DIAGRAM:verification@@
 
-The verifier and the evaluation suite are what this notebook adds.
+## What you will see
+
+Five short scenes:
+
+1. A claim tag, step by step, and the model's answer to the main question with every number checked.
+2. A wrong number and a number with no tag: how the verifier marks them.
+3. Two versions of the application, to be compared.
+4. The evaluation suite: the eight questions, and a table of results for each version.
+5. How to read the table, and what the suite does not cover.
+
+## How to run it
+
+Run the cells in order. The model's answers are recorded ones, labelled `[recorded output: ...]`, as in notebook 01. The searches, the tool results, the checks and the tables are computed when you run the cell. The exercises at the end run without a key.
 """),
     code(SETUP),
     code('''
@@ -1317,8 +1339,8 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 docs = w.load_documents()
-store = w.build_store(w.split_sections(docs))
-search_documents = w.make_search_tool(store, k=3, since="2020")
+store = w.build_store(w.split_sections(docs))   # the store of notebooks 02 and 03
+search_documents = w.make_search_tool(store, k=3, since="2020")   # the tools of notebooks 04 and 05
 tools = [search_documents, w.get_indicator]
 
 INSTRUCTIONS_CLAIMS = """You are a research assistant for development data.
@@ -1331,43 +1353,56 @@ If the question is ambiguous, ask which reading is meant."""
     md("""
 ## 1. Claim tags
 
-The instructions ask the model to wrap each figure in a tag that names the observation it came from. `w.verify` finds the tags and hands each number and its record to `pcn_core.compare_by_policy` with the policy from the tag: rounded to the stated decimals, or exact. This is the Proof-Carrying Numbers protocol used in the program's chatbot, with the same comparison code.
+The instruction in the cell above asks the model to wrap each figure from the tool in a tag. The picture shows the parts of one tag, and what the verifier does with it: it takes the record named by the `claim_id`, compares it with the number inside the tag by the stated policy (rounded to some decimals, or exact), and marks the result. This is the Proof-Carrying Numbers protocol that the program's chatbot uses, with the same comparison code.
+
+@@EXPLAINER:claimtag@@
+
+The cell gives the model the four series that the main question needs, and shows what it wrote, tags included, then the answer as a reader sees it, then the verifier's marks.
 """),
     code('''
 results = [w.indicator_lookup(i, c, start=2010) for i in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"] for c in ["Kenya", "Rwanda"]]
-observations = w.observations_from_results(results)
-print(len(observations), "observations available to the verifier, for example", list(observations)[:2])
+observations = w.observations_from_results(results)   # claim_id -> the value the tool returned
+print(len(observations), "records available to the verifier; for example:")
+w.show_table(["claim_id", "value"], [(cid, f"{observations[cid]:g}") for cid in list(observations)[:3]])
 
 w.use("nb06_claims_main")
 reply = model.invoke([SystemMessage(content=INSTRUCTIONS_CLAIMS), HumanMessage(content="DATA:\\n" + json.dumps(results) + "\\n\\nQUESTION: " + w.MAIN_QUESTION)])
+print("\\nWhat the model wrote, tags included:\\n")
+print(reply.content)
 print("\\nAs the reader sees it:\\n")
 w.show(w.strip_claims(reply.content))
-print("\\nVerification:\\n")
-w.print_checks(w.verify(reply.content, observations))
+print("\\nThe verifier's marks:\\n")
+w.show_checks(w.verify(reply.content, observations))
 '''),
     md("""
-Every tagged number matches its record. Years are not claims and are skipped.
+Every number carries its label, and every label holds. This is what the check of notebook 05 could not do: it matched numbers to values and guessed, and this one reads which record the model meant. Years are not figures to check, so they are skipped. The application can now check every number that the model says comes from the tool.
 
-## 2. A wrong number and a number without a claim
+## 2. A wrong number, and a number with no tag
 
-The planted problem. One tagged figure has been altered, and one figure has no tag because it came from nowhere in the data. The verifier flags the first and marks the second as unmarked: it carries no claim, so it receives no mark, whether or not it happens to be right.
+Two things can go wrong, and the cell shows one of each. In this recorded answer, one tagged figure has been altered (Rwanda's internet use is given as 35.7 instead of 31.7), and one figure has no tag because it did not come from the data: "about 70 percent … use mobile money". The verifier flags the first. The second it marks **unmarked**: it carries no claim, so there is nothing to check it against, and no mark is drawn, whether or not it happens to be right.
 """),
     code('''
 w.use("nb06_claims_error")
-reply = model.invoke([SystemMessage(content=INSTRUCTIONS_CLAIMS), HumanMessage(content="DATA:\\n" + json.dumps(results) + "\\n\\nQUESTION: " + w.MAIN_QUESTION)])
-w.show(w.strip_claims(reply.content))
+flawed = model.invoke([SystemMessage(content=INSTRUCTIONS_CLAIMS), HumanMessage(content="DATA:\\n" + json.dumps(results) + "\\n\\nQUESTION: " + w.MAIN_QUESTION)])
+w.show(w.strip_claims(flawed.content))
 print()
-w.print_checks(w.verify(reply.content, observations))
+w.show_checks(w.verify(flawed.content, observations))
 '''),
     md("""
-A reader of the chatbot sees a mark beside each number. A flagged number is one the model changed. An unmarked number is one the model did not tie to a record, and the fail-closed rule says it gets no mark.
+A reader of the program's chatbot sees a mark beside each number. A flagged number is one the model changed. An unmarked number is one the model did not tie to a record, and the rule is that it gets no mark: no tag, no mark. The same holds for the numbers of notebook 05 that the model worked out itself, such as a rise of "about 28 percentage points". They have no single record, so they stay unmarked, and a reader knows to look at them.
 
-What the check says nothing about: whether the record is the right one for the question, whether the method behind it is sound, or whether the sentence around the number interprets it correctly. Those stay with the reader.
+What the check says nothing about: whether the record is the right one for the question, whether the method behind it is sound, or whether the sentence around the number interprets it correctly. Those stay with the reader. The application can now flag a number that does not match its record, and leave unmarked a number that has no record.
 
-## 3. Two configurations of the application
+## 3. Two versions of the application
 
-- **A, retrieval only**: the RAG chain of notebook 03. Passages as context, no tools, no tags.
-- **B, tools and claims**: the agent of notebook 05 with the claim instructions, and the verifier.
+A check on one answer is not yet a measure of the application. The second half of the notebook compares two configurations on the same questions:
+
+| Configuration | What it uses | Built in |
+|---|---|---|
+| **A · retrieval only** | The search, then the model writes from the passages. No tools, no tags. | Notebook 03 |
+| **B · tools and claims** | The agent with both tools, the claim instructions above, and the verifier. | Notebooks 04 and 05, and this one |
+
+The cell defines both as functions that take a question and return the answer, the passages the search found, and the records the tools returned.
 """),
     code('''
 INSTRUCTIONS_RAG = """You are a research assistant for development data.
@@ -1392,19 +1427,25 @@ def app_tools(question, scenario):
     return w.final_text(result), hits, obs
 '''),
     md("""
+The application can now be run as a function of a question, which is what a suite needs.
+
 ## 4. The evaluation suite
 
-Eight questions with expected documents, expected numbers, and expected behaviour, from `assets/questions.json`. For each question and configuration the table reports:
-
-- **retrieval**: did the top-4 passages include an expected document
-- **numbers**: how many expected values appear in the answer
-- **cited**: does the answer cite a retrieved document or name a source
-- **verify**: counts of verified, flagged, and unmarked numbers (configuration B only)
+The suite is eight questions from `assets/questions.json`, each of a different kind: the main question, factual ones, an ambiguous one, a missing year, an out-of-scope one, a definition, and one where the evidence is outdated. Each has the documents and numbers a good answer should use, and the behaviour it should show.
 """),
     code('''
 questions = w.load_questions()
+w.show_table(["id", "kind", "question", "what a good answer does"], [(q["id"], q["category"], q["question"], q["behaviour"]) for q in questions])
+'''),
+    md("""
+For each question and each configuration, the table reports four things:
 
-
+- **retrieval**: did the four passages that the search found include an expected document?
+- **numbers**: how many of the expected numbers appear in the answer?
+- **cited**: does the answer cite a retrieved document, or name a source?
+- **verified / flagged / unmarked**: the verifier's counts (configuration B only, since only B uses tags).
+"""),
+    code('''
 def evaluate(app, prefix):
     rows = []
     for qd in questions:
@@ -1413,45 +1454,53 @@ def evaluate(app, prefix):
         cited = w.grounded(answer, hits) or "WDI" in answer or "World Development Indicators" in answer
         if obs:
             checks = w.verify(answer, obs)
-            v = sum(c.status == "verified" for c in checks); f = sum(c.status == "flagged" for c in checks); u = sum(c.status == "unmarked" for c in checks)
-            ver = f"{v}v {f}f {u}u"
+            v, f, u = (sum(c.status == s for c in checks) for s in ("verified", "flagged", "unmarked"))
+            ver = f"{v} / {f} / {u}"
         else:
-            ver = "n/a" if prefix.endswith("rag") else "no data used"
-        rows.append(w.EvalRow(qd["id"], qd["category"], "hit" if w.retrieval_hit(hits, qd["expected_documents"]) else "miss", f"{found}/{total}", "yes" if cited else "no", ver))
+            ver = "not applicable" if prefix.endswith("rag") else "no tool data used"
+        rows.append(w.EvalRow(qd["id"], qd["category"], "hit" if w.retrieval_hit(hits, qd["expected_documents"]) else "miss", f"{found}/{total}" if total else "none expected", "yes" if cited else "no", ver))
     return rows
 
 
 print("A · retrieval only\\n")
-w.print_table(evaluate(app_rag, "nb06_rag"))
-print("\\n\\nB · tools and claims\\n")
-w.print_table(evaluate(app_tools, "nb06_tools"))
+w.show_eval(evaluate(app_rag, "nb06_rag"))
+print("\\nB · tools and claims\\n")
+w.show_eval(evaluate(app_tools, "nb06_tools"))
 '''),
     md("""
+The application can now be measured across questions, and two versions of it compared.
+
 ## 5. Reading the table
 
-- **q8, outdated evidence.** Configuration A answers from the 2016 summary when it ranks first and reports 2015 figures; B fetches the series and reports 2024. The expected numbers are found in B and missed in A.
-- **q3, ambiguous.** Neither configuration should produce a number. B asks which reading is meant, as its instructions say; A picks one. The table shows 0/0 for both; the behaviour has to be read.
-- **q4, missing data.** Both say that 2025 is unavailable; B's statement rests on an empty tool result.
+- **q8, outdated evidence.** Both configurations "hit" on retrieval. Yet A answers from the 2016 summary, with 2015 figures, and finds none of the two expected numbers, while B fetches the series and reports 2024. No single column tells the whole story: retrieval alone said A was fine.
+- **q3, ambiguous.** Neither configuration should answer with a single number. B asks which measure is meant, as its instructions say. A answers without asking, with both measures at once. The numbers column shows "none expected" for both: the behaviour has to be read, not counted.
+- **q4, missing data.** Both say that 2025 is unavailable and give 2024. B's statement rests on an empty tool result.
 - **q5, out of scope.** Both give no number. A's retrieval "hit" is the coffee note, which is the expected document and contains no figures.
-- **verify.** In B every number from the data tool is verified; in A there is nothing to verify against, because no number came from a tool.
+- **Verified, flagged, unmarked.** In B every number that came from the data tool is verified, and nothing is flagged. In A there is nothing to verify against, because no number came from a tool.
 
-A table like this is what distinguishes a demonstration from a measured application. It is rerun after every change to the instructions, the tools, the store, or the model. For suites at scale, with a model as a judge for the behaviours a rule cannot check, see the program's evaluation cookbook; libraries such as Ragas and DeepEval provide those judges.
+A table like this is what separates a demonstration from a measured application. It is rerun after every change to the instructions, the tools, the store or the model. For suites at scale, with a model as a judge for the behaviours that a rule cannot check, see the program's evaluation cookbook; libraries such as Ragas and DeepEval provide those judges.
 
 ## 6. What the suite does not cover
 
 - Whether the application chose the right indicator for the question. A verified number from the wrong series is verified.
 - Whether the interpretation around the numbers is right.
-- Behaviour on questions nobody wrote down. The suite grows from use: every failure found in use becomes a question.
+- Behaviour on questions that nobody wrote down. The suite grows from use: every failure found in use becomes a question.
 
 ## Key points
 
-- Verification checks each number against its source record with `pcn-core` and fails closed: no claim, no mark.
-- Evaluation runs the application over questions with known evidence and expected behaviour, and is rerun on every change.
-- The two configurations differ most on outdated evidence and on numbers: tools make numbers checkable; retrieval alone does not.
+- Notebook 05 could only match numbers to values, and guessed. A claim tag names the record that a number comes from, and the verifier compares the two: verified, flagged, or unmarked.
+- The rule is that an untagged number gets no mark. The verifier cannot say whether a number is right, only whether it matches the record it names.
+- Evaluation runs the application over questions with known evidence and expected behaviour, and is rerun on every change. One column is rarely enough: on q8 retrieval alone said the weaker version was fine.
+- The two configurations differ most on outdated evidence and on numbers: tools make numbers checkable, and retrieval alone does not.
 
 ## Exercise
 
-Add a ninth question to `assets/questions.json` with an expected number that is deliberately wrong, rerun the suite, and confirm that the numbers column catches it. Then correct it.
+All of these run without a key, on the answer of section 1 (`reply`).
+
+1. Take the answer of section 1 and change one number inside a tag: `tampered = reply.content.replace(">35.0<", ">35.7<")`, then `w.show_checks(w.verify(tampered, observations))`. Which mark changes, and what does the record hold?
+2. Remove all the tags: `plain = w.strip_claims(reply.content)`, then `w.show_checks(w.verify(plain, observations))`. What happens to every number, and why is it not a "verified" result?
+3. Change the policy of one tag from rounded to exact: `strict = reply.content.replace('policy="rounded" decimals="1"', 'policy="exact"', 1)`, then verify it. Why does 35.0 stop matching a record of 34.9762, and which policy would you want for a published percentage?
+4. Look at the eight questions of section 4. Which kind of question would you add next, and what would a good answer to it do? Failures found in use are the best source.
 """),
     md(LINKS),
 ]
