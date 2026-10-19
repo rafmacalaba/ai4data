@@ -452,7 +452,8 @@ def metadata_svg():
 
 # --------------------------------------------------------------- notebook 04: the model asks, the application runs the tool -------------------
 def toolloop_svg():
-    W, H, T = 1000, 540, 20.0
+    W, H, T = 1000, 600, 20.0
+    LIFE = 478  # lifelines end here; the four narration lines sit below
     xs = {"model": 170, "app": 500, "tool": 830}
     green = CTX
     p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
@@ -465,7 +466,7 @@ def toolloop_svg():
         p.append(f'<rect x="{x - 105}" y="56" width="210" height="50" rx="10" fill="{fill}" stroke="{col}" stroke-width="1.8"/>'
                  f'<text x="{x}" y="77" text-anchor="middle" font-size="14.5" font-weight="700" fill="{col}">{name}</text>'
                  f'<text x="{x}" y="96" text-anchor="middle" font-size="11.5" fill="{GREY}">{sub}</text>'
-                 f'<line x1="{x}" y1="106" x2="{x}" y2="{H - 62}" stroke="#c9d1de" stroke-width="1.5" stroke-dasharray="5 5"/>')
+                 f'<line x1="{x}" y1="106" x2="{x}" y2="{LIFE}" stroke="#c9d1de" stroke-width="1.5" stroke-dasharray="5 5"/>')
 
     def step(n, y, src, dst, label, s, e, col=BLUE):
         x1, x2 = xs[src], xs[dst]
@@ -491,8 +492,13 @@ def toolloop_svg():
         ("3  ·  The application runs the tool, and the tool returns data", 9.4, 14.2, 0),
         ("4  ·  The application hands the result back, and the model writes its answer from it", 14.2, 20.4, 1),
     ]
-    for label, s, e, base in caps:
-        p.append(group(f'<text x="24" y="{H - 24}" font-size="14.5" font-weight="700" fill="{BLUE}">{escape(label)}</text>', s, e, T, base))
+    # all four lines are always shown (so a still image reads in full); the current one is highlighted
+    for i, (label, s, e, base) in enumerate(caps):
+        y = LIFE + 40 + i * 25
+        p.append(f'<text x="24" y="{y}" font-size="14" fill="{GREY}">{escape(label)}</text>')
+        p.append(group(f'<rect x="20" y="{y - 15}" width="970" height="21" fill="#ffffff"/>'
+                       f'<text x="24" y="{y}" font-size="14" font-weight="700" fill="{BLUE}">{escape(label)}</text>'
+                       f'<rect x="10" y="{y - 14}" width="5" height="18" rx="2" fill="{BLUE}"/>', s, e, T, base))
     p.append("</svg>")
     return "".join(p)
 
