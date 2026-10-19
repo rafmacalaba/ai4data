@@ -806,12 +806,12 @@ Five short scenes:
 1. The four figures that the main question needs: what the search of notebook 03 found, and what the tool returns.
 2. The tool as the model sees it, and an animation of the model asking for it, step by step.
 3. A year that has no data: the tool says so, and the model passes it on.
-4. A structured output: free text that a program misreads, then the same answer as a filled-in form, and what happens when a field is damaged.
-5. The same tool offered over MCP and used by an agent, and an optional call to a public server.
+4. A structured output: a program that misreads a sentence, then the same answer in a blank form that the model fills in, and what happens when a box is damaged.
+5. The same tool offered over MCP and used by an agent, and a call to the program's public server.
 
 ## How to run it
 
-Run the cells in order. The model's answers are recorded ones, labelled `[recorded output: ...]`, as in notebook 01. The tool results, tables and checks are computed when you run the cell. The last cell is optional: it reaches a public server and needs the internet.
+Run the cells in order. The model's answers are recorded ones, labelled `[recorded output: ...]`, as in notebook 01. The tool results, tables and checks are computed when you run the cell. The last cell reaches a public server and needs the internet.
 """),
     code(SETUP),
     md("""
@@ -928,39 +928,21 @@ print()
 w.show(model_with_tools.invoke(messages))
 '''),
     md("""
-Compare with notebook 01, where the model answered the same question from a brief. Here the absence is a fact returned by the tool, which the application can test for. The application can now say that data is missing, instead of filling the gap.
+## 5. Structured output: an answer in a fixed shape
 
-## 5. Structured output: the answer as a filled-in form
-
-An answer that another program will read, store or display needs a fixed shape. Free text does not have one. The cell takes the answer of section 3, "Rwanda's GDP per capita in 2023 was 1,061 US dollars…", and does what a simple program might do with it: take the first number.
+So far the model's answers are sentences, which suits a person. Suppose instead that a dashboard has a box labelled "GDP per capita, Rwanda" and must fill it from the model's answer. The cell does what a simple program might do: it takes the first number in the sentence from section 3.
 """),
     code('''
 import re
 
 first = re.findall(r"\\d[\\d,]*\\.?\\d*", final.content)[0]
-print("The first number in the free-text answer of section 3:", first)
+print("The answer:           ", final.content)
+print("The dashboard's box:  ", first)
 '''),
     md("""
-It is the year, not the figure. Words around a number change from one answer to the next, so a program that reads free text has to guess. A structured output removes the guessing: the model fills in named fields, and the program reads the field `value`. `ComparisonAnswer` is the form, a Pydantic model: for each country, the latest internet figure and the latest GDP figure, each with its year and value, then a comparison text, the sources and any caveats. `with_structured_output` sends the form with the request and checks the response against it on the way back. The cell lists the form's fields.
-"""),
-    code('''
-import typing
+The box gets 2023, which is the year. The figure is 1,061, but the words around a number change from one answer to the next, so a program reading a sentence has to guess.
 
-
-def type_name(annotation):
-    plain = {"str": "text", "int": "whole number", "float": "number"}
-    inner = typing.get_args(annotation)
-    name = inner[0].__name__ if inner else annotation.__name__
-    return ("list of " if inner else "") + plain.get(name, name)
-
-
-fields = [("ComparisonAnswer", name, type_name(f.annotation), "required" if f.is_required() else "optional") for name, f in w.ComparisonAnswer.model_fields.items()]
-fields += [("CountrySummary", name, type_name(f.annotation), "required") for name, f in w.CountrySummary.model_fields.items()]
-fields += [("Observation", name, type_name(f.annotation), "required") for name, f in w.Observation.model_fields.items()]
-w.show_table(["part of the form", "field", "type", ""], fields, source="CountrySummary is filled in once per country; Observation once per figure.")
-'''),
-    md("""
-The next cell gives the model the tool's data and asks it to fill in the form. The result is a Python object, shown as a table of the figures and then the text fields.
+The fix is to stop asking for a sentence. We hand the model a **blank form** with a named box for each thing we need: a country, a year and a value for internet use, a year and a value for GDP per capita, a comparison, the sources. The model's job is to fill in the boxes, and the program reads each box by name. The blank form is called a **schema**, and an answer that follows one is a **structured output**. In code the form is a class written with a library called Pydantic, and `with_structured_output` sends it to the model with the request. The next cell gives the model the tool's data, asks it to fill in the form, and draws the blank form beside the filled one.
 """),
     code('''
 data = [w.indicator_lookup(i, c, start=2024) for i in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"] for c in ["Kenya", "Rwanda"]]
@@ -971,14 +953,17 @@ parsed = structured.invoke([
     SystemMessage(content="Fill the schema from the data you are given. Use the values exactly as given."),
     HumanMessage(content="DATA:\\n" + json.dumps(data) + "\\n\\nQUESTION: " + w.MAIN_QUESTION),
 ])
-w.show_table(["country", "internet use, year", "internet use, %", "GDP per capita, year", "GDP per capita, US$"],
-             [(countries[cs.country], cs.internet_latest.year, f"{cs.internet_latest.value:.1f}", cs.gdp_per_capita_latest.year, f"{cs.gdp_per_capita_latest.value:,.0f}") for cs in parsed.countries])
-print()
-w.show("comparison: " + parsed.comparison)
-print("sources:   ", "; ".join(parsed.sources))
+w.show_form(w.ComparisonAnswer, parsed)
 '''),
     md("""
-The checking is what makes the form a contract. The cell damages the answer by replacing a year with words, and shows the error that a program reading it would receive. Without the check the program would receive a wrong value and no error.
+Now the dashboard does not guess. It reads the box it needs by its name, and gets the figure and its year.
+"""),
+    code('''
+box = next(cs for cs in parsed.countries if cs.country == "RWA").gdp_per_capita_latest
+print("GDP per capita, Rwanda:", f"{box.value:,.0f} US dollars, in {box.year}")
+'''),
+    md("""
+A form also has rules, and the program checks the answer against them before using it. A box that should hold a year cannot hold words. The cell damages the answer by putting words in a year box, and shows the message the program would receive, which names the exact box. Without the check, a wrong value would pass through with no error.
 """),
     code('''
 from pydantic import ValidationError
@@ -987,16 +972,12 @@ damaged = parsed.model_dump_json().replace('"year":2024', '"year":"twenty twenty
 try:
     w.ComparisonAnswer.model_validate_json(damaged)
 except ValidationError as e:
-    field = " > ".join(str(part) for part in e.errors()[0]["loc"])
-    print("field:  ", field)
-    print("problem:", e.errors()[0]["msg"])
+    box = " > ".join(str(part) for part in e.errors()[0]["loc"])
+    print("box with the problem:", box)
+    print("what is wrong:       ", e.errors()[0]["msg"])
 '''),
     md("""
-The application can now return an answer that other software reads, and reject one that breaks the form.
-
-## 6. The same tool over MCP
-
-MCP is the standard plug: a tool written once as a server can be used by any program that speaks the standard, whether a chatbot, a desktop assistant or an agent. `indicator_server.py` wraps `get_indicator` in a FastMCP server in a dozen lines. The FastMCP client below starts it, lists its tools and calls one.
+The application can now return an answer that other software reads box by box, and reject one that breaks the form.
 """),
     code('''
 from fastmcp import Client
@@ -1035,7 +1016,7 @@ w.show(w.final_text(result))
     md("""
 The application can now offer its tool to any program that speaks MCP.
 
-**Optional.** The program's [Data360 MCP server](https://github.com/worldbank/data360-mcp) offers search, metadata and data tools over the World Bank's data platform in the same way, at a public address. The cell lists its tools and runs one search. It needs the internet and a live server, so the list can differ from run to run, and if the call fails the cell says so and the notebook carries on.
+The program's [Data360 MCP server](https://github.com/worldbank/data360-mcp) offers search, metadata and data tools over the World Bank's data platform in the same way, at a public address. The cell lists its tools and runs one search. It reaches a live server, so the list can differ from run to run, and if the call fails the cell says so and the notebook carries on.
 """),
     code('''
 try:

@@ -9,6 +9,8 @@ workshop.py imports these functions, so notebook 01 calls them as w.show_claim_c
     search_comparison_html(question, columns, checks)  one search on two versions of a collection, side by side
     prompt_html(messages)    the messages of one call, colour-coded: instructions, context, question
     show_prompt(messages)    the same, displayed
+    form_html(model, answer)  a structured-output schema as a blank form, beside the same form filled in
+    show_form(model, answer)  the same, displayed
 """
 
 from html import escape
@@ -187,3 +189,60 @@ def prompt_html(messages):
 
 def show_prompt(messages):
     display(HTML(prompt_html(messages)))
+
+
+def form_rows(model, value=None, depth=0):
+    """The fields of a Pydantic model as (depth, name, text) rows. With no value the text is the kind of entry expected; with one it is the entry.
+
+    A part made only of simple fields (an observation) takes one row, showing its year and value; the ids repeated in it are left out."""
+    import typing
+
+    plain = {"str": "text", "int": "whole number", "float": "number"}
+
+    def shown(x):
+        return (f"{x:,.0f}" if x >= 1000 else f"{x:,.1f}") if isinstance(x, float) else str(x)
+
+    rows = []
+    for name, field in model.model_fields.items():
+        inner = typing.get_args(field.annotation)
+        kind = inner[0] if inner else field.annotation
+        many = bool(inner)
+        entry = getattr(value, name, None) if value is not None else None
+        if hasattr(kind, "model_fields"):
+            parts = [f for f, fi in kind.model_fields.items() if f not in ("indicator", "country")]
+            if not many and not any(hasattr(fi.annotation, "model_fields") for fi in kind.model_fields.values()):
+                text = "   ".join(f"{p}: " + (plain.get(kind.model_fields[p].annotation.__name__, "") if value is None else shown(getattr(entry, p))) for p in parts)
+                rows.append((depth, name, text))
+                continue
+            items = (entry if many else [entry]) if value is not None else [None]
+            rows.append((depth, name + (" (one block per country)" if many else ""), ""))
+            for item in items:
+                rows += form_rows(kind, item, depth + 1)
+        elif value is None:
+            rows.append((depth, name, ("list of " if many else "") + plain.get(kind.__name__, kind.__name__)))
+        else:
+            text = "; ".join(map(str, entry)) if many else shown(entry)
+            rows.append((depth, name, text if len(text) < 60 else text[:57] + "..."))
+    return rows
+
+
+def form_html(model, answer):
+    """Two cards side by side: the blank form (what each box expects) and the same form filled in with an answer."""
+
+    def card(title, rows, filled):
+        lines = "".join(
+            f'<div style="padding:3px 0 3px {depth * 18}px;border-bottom:1px solid #eef1f6"><span style="color:#6b7280">{escape(name)}</span>'
+            + (f' <span style="font-weight:600;color:{"#1f6b43" if filled else "#9aa3b2"}{"" if filled else ";font-style:italic"}">{escape(text) if filled else "[ " + escape(text) + " ]"}</span>' if text else "")
+            + "</div>"
+            for depth, name, text in rows
+        )
+        return (f'<div style="{CARD};flex:1;min-width:280px"><div style="font-weight:700;margin-bottom:6px">{title}</div>'
+                f'<div style="font:13px Helvetica,Arial,sans-serif">{lines}</div></div>')
+
+    return ('<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;font:14px Helvetica,Arial,sans-serif">'
+            + card("The blank form (the schema)", form_rows(model), False)
+            + card("The same form, filled in by the model", form_rows(model, answer), True) + "</div>")
+
+
+def show_form(model, answer):
+    display(HTML(form_html(model, answer)))
