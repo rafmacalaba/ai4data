@@ -786,7 +786,7 @@ Notebook 03 ended on a limit of search. Even when the right documents come back,
 
 The application so far keeps documents in a store, searches the store, and hands the model the passages it finds (notebook 03). That stays, for definitions and context. This notebook adds a second source of evidence, a tool for exact numbers, and a second kind of answer.
 
-Three terms, in plain words:
+Four terms, in plain words:
 
 - A **tool** is a function that the application can run for the model. The model cannot run it itself: it asks, the application runs it, and the result goes back to the model.
 - A **structured output** is an answer returned in a fixed shape, with named fields, instead of free text, so that another program can read it without guessing.
@@ -940,7 +940,7 @@ print("The answer:           ", final.content)
 print("The dashboard's box:  ", first)
 '''),
     md("""
-The box gets 2023, which is the year. The figure is 1,061, but the words around a number change from one answer to the next, so a program reading a sentence has to guess.
+The box gets 2023, which is the year and not a figure. The sentence holds three figures for different years, and the words around them change from one answer to the next, so a program reading a sentence has to guess which one is wanted.
 
 The fix is to stop asking for a sentence. We hand the model a **blank form** with a named box for each thing we need: a country, a year and a value for internet use, a year and a value for GDP per capita, a comparison, the sources. The model's job is to fill in the boxes, and the program reads each box by name. The blank form is called a **schema**, and an answer that follows one is a **structured output**. In code the form is a class written with a library called Pydantic, and `with_structured_output` sends it to the model with the request. The next cell gives the model the tool's data, asks it to fill in the form, and draws the blank form beside the filled one.
 """),
@@ -978,6 +978,10 @@ except ValidationError as e:
 '''),
     md("""
 The application can now return an answer that other software reads box by box, and reject one that breaks the form.
+
+## 6. The same tool over MCP
+
+MCP is the standard plug: a tool written once as a server can be used by any program that speaks the standard, whether a chatbot, a desktop assistant or an agent. `indicator_server.py` wraps `get_indicator` in a FastMCP server in a dozen lines. The FastMCP client below starts it, lists its tools and calls one.
 """),
     code('''
 from fastmcp import Client
