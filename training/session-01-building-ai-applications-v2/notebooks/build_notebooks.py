@@ -776,18 +776,19 @@ Question q1, the main question, passes the first check, though only the two inte
 # =============================================================================
 NB04 = [
     md("""
-# 04 · Connecting the application to data and tools
+# 04 · Tools and structured outputs
 
 **Session 01 · Building AI applications for research and data · notebook 4 of 6**
 
 ## Objective
 
-Notebook 03 ended on a limit of search. Even when the right documents come back, the passages may not hold the figures an answer needs: for the main question, the four passages held two of the four numbers. For numbers, the application can skip the search and ask a tool instead, which looks the figure up in the data itself. This notebook gives the model such a tool, watches it use the tool, makes its answer a form that other software can read, and then offers the same tool to other programs.
+Notebook 03 ended on a limit of search. Even when the right documents come back, the passages may not hold the figures an answer needs: for the main question, the four passages held two of the four numbers. For numbers, the application can skip the search and ask a tool instead, which looks the figure up in the data itself. This notebook gives the model such a tool, watches it use the tool, makes its answer a structured output that other software can read, and then offers the same tool to other programs.
 
 Three terms, in plain words:
 
 - A **tool** is a function that the application can run for the model. The model cannot run it itself: it asks, the application runs it, and the result goes back to the model.
-- A **schema** is a form with named fields and types ("year: a whole number") that an answer must fill in, so that another program can read it.
+- A **structured output** is an answer returned in a fixed shape, with named fields, instead of free text, so that another program can read it without guessing.
+- A **schema** is the description of that shape: the named fields and their types ("year: a whole number") that the answer must fill in.
 - **MCP**, the Model Context Protocol, is a standard plug for tools. A tool offered through it can be used by any program that speaks the standard, such as a chatbot or a desktop assistant.
 
 ## The application after this notebook
@@ -803,7 +804,7 @@ Five short scenes:
 1. The four figures that the main question needs: what the search of notebook 03 found, and what the tool returns.
 2. The tool as the model sees it, and an animation of the model asking for it, step by step.
 3. A year that has no data: the tool says so, and the model passes it on.
-4. The answer as a filled-in form that other software can read, and what happens when a field is damaged.
+4. A structured output: free text that a program misreads, then the same answer as a filled-in form, and what happens when a field is damaged.
 5. The same tool offered over MCP and used by an agent, and an optional call to a public server.
 
 ## How to run it
@@ -903,7 +904,8 @@ for call in reply.tool_calls:
     messages += [reply, ToolMessage(content=json.dumps(result), tool_call_id=call["id"])]
 print()
 print("3. The model writes its answer from the result:")
-w.show(model_with_tools.invoke(messages))
+final = model_with_tools.invoke(messages)
+w.show(final)
 '''),
     md("""
 ## 4. Data that does not exist
@@ -924,9 +926,18 @@ w.show(model_with_tools.invoke(messages))
     md("""
 Compare with notebook 01, where the model answered the same question from a brief. Here the absence is a fact returned by the tool, which the application can test for.
 
-## 5. The answer as a filled-in form
+## 5. Structured output: the answer as a filled-in form
 
-An answer that another program will read, store or display needs a fixed shape. `ComparisonAnswer` is the form, a Pydantic model: for each country, the latest internet figure and the latest GDP figure, each with its year, value and claim id, then a comparison text, the sources and any caveats. `with_structured_output` sends the form with the request and checks the response against it on the way back. The cell lists the form's fields.
+An answer that another program will read, store or display needs a fixed shape. Free text does not have one. The cell takes the answer of section 3, "Rwanda's GDP per capita in 2023 was 1,061 US dollars…", and does what a simple program might do with it: take the first number.
+"""),
+    code('''
+import re
+
+first = re.findall(r"\\d[\\d,]*\\.?\\d*", final.content)[0]
+print("The first number in the free-text answer of section 3:", first)
+'''),
+    md("""
+It is the year, not the figure. Words around a number change from one answer to the next, so a program that reads free text has to guess. A structured output removes the guessing: the model fills in named fields, and the program reads the field `value`. `ComparisonAnswer` is the form, a Pydantic model: for each country, the latest internet figure and the latest GDP figure, each with its year, value and claim id, then a comparison text, the sources and any caveats. `with_structured_output` sends the form with the request and checks the response against it on the way back. The cell lists the form's fields.
 """),
     code('''
 import typing
@@ -1035,7 +1046,7 @@ except Exception as e:
 - Numbers come from a tool over authoritative data, and the model's memory is for language. In this notebook the search found two of the four figures the main question needs, and the tool returned all four.
 - A tool is a function with a description the model can read and a form the model fills in. The model does not run it: the application does, and hands the result back.
 - Absence of data is a tool result that the application can test for, instead of a gap the model fills with a guess.
-- A schema turns the answer into a contract: checked on the way in, and readable by other software on the way out.
+- A structured output is an answer in a fixed shape: the model fills in named fields instead of writing free text, which a program would have to guess at. The schema is the contract: checked on the way in, readable by other software on the way out.
 - MCP is the standard plug: the same tool, written once as a server, is available to any program that speaks it.
 
 ## Exercise
