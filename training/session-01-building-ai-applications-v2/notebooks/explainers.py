@@ -482,7 +482,7 @@ def toolloop_svg():
     step(1, 150, "app", "model", "question + the tools it may ask for", 0.4, end)
     step(2, 215, "model", "app", "asks: get_indicator(GDP per capita, Rwanda, 2023)", 5.0, end)
     step(3, 280, "app", "tool", "runs it", 9.5, end, green)
-    step(4, 335, "tool", "app", "2023: 1,061 · source · claim id", 11.0, end, green)
+    step(4, 335, "tool", "app", "2023: 1,061 · with its source", 11.0, end, green)
     step(5, 400, "app", "model", "hands the result back", 14.3, end)
     step(6, 465, "model", "app", "answer: 1,061 US dollars in 2023 [source]", 16.2, end)
     caps = [
@@ -504,7 +504,7 @@ ALT = {
     "prompt": "Animation: instructions set by the developer, context supplied by the application and a question asked by the user are combined into one prompt, which goes to the model and produces an answer that cites its source.",
     "before_after": "Diagram: the same question without context gets an answer with no source, no date and a blend of two measures; with the four country briefs as context it gets a dated answer that cites its source.",
     "metadata": "Diagram: one document in two parts. Its metadata, the header of the file, holds the date 2016-06-01; its text sounds current and ends 'The latest available figures are for 2015.' An application can filter and rank on the date field, but it does not read the text for age.",
-    "toolloop": "Animation: the application sends the model the question and the list of tools; the model replies with a request for get_indicator with GDP per capita, Rwanda and 2023; the application runs the tool, which returns 1,061 with its source and claim id; the application hands that back and the model answers that it was 1,061 US dollars in 2023.",
+    "toolloop": "Animation: the application sends the model the question and the list of tools; the model replies with a request for get_indicator with GDP per capita, Rwanda and 2023; the application runs the tool, which returns 1,061 with its source; the application hands that back and the model answers that it was 1,061 US dollars in 2023.",
     "desk": "Diagram: the four briefs of this notebook, about 1,024 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 

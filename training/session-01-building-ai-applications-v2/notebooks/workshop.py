@@ -389,7 +389,6 @@ class Observation(BaseModel):
     country: str = Field(description="ISO3 code")
     year: int
     value: float
-    claim_id: str = Field(description="<indicator>:<ISO3>:<year>")
 
 
 class CountrySummary(BaseModel):

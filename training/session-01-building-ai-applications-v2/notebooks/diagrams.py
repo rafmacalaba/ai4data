@@ -42,7 +42,7 @@ ALT = {
     "prompt": "Diagram: the question and the context feed the prompt, which goes to the model and produces the answer.",
     "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, built in notebook 03: the question and the retrieved passages from the vector store feed the prompt, then the model and the answer.",
     "retrieval": "Diagram: the question goes to retrieval, a search of the vector store that returns the closest chunks as passages; the passages and the question go into the prompt, then to generation, where the model writes an answer with citations.",
-    "tools": "Diagram: the question goes to the model, which calls the tool get_indicator with an indicator, a country and optional start and end years, and receives data that returns to the model, which answers with text or a structured output, a filled-in form that other software can read. Separately, the same tool is served over MCP to any MCP client, such as this notebook, a chatbot or a desktop assistant.",
+    "tools": "Diagram: the question goes to a search of the store, which returns passages for the prompt; the prompt goes to the model. New in this notebook: the model can call the tool get_indicator with an indicator, a country and optional start and end years; the data it returns goes back into the prompt; the model answers with text or a structured output, a filled-in form that other software can read. Separately, the same tool is served over MCP to any MCP client, such as this notebook, a chatbot or a desktop assistant.",
     "agent": "Diagram: the question goes to the model, which calls search_documents with a query, getting passages, or get_indicator with an indicator, a country and optional start and end years, getting data; the results return to the model, which answers. The tools run in a fixed order in a chain, or are chosen by the model, with a recursion limit and a trace.",
     "verification": "Diagram: the question goes to an agent with tools, which produces an answer with claim tags; pcn-core marks each number as verified, flagged or unmarked. Separately, the evaluation suite produces a table per question.",
 }
@@ -107,15 +107,18 @@ def flow(name: str, stage: int | None = None) -> Flow:
         return Flow(
             [
                 ("q", "question", "normal"),
+                ("s", "retrieval\n(search the store,\nreturns passages)", "normal"),
+                ("pr", "prompt\ninstructions + passages\n+ question", "normal"),
                 ("m", "model", "normal"),
-                ("t", "tool call:\nget_indicator(indicator,\ncountry, start, end)", "hot"),
+                ("a", "answer, or a\nstructured output\n(a filled-in form)", "hot"),
                 ("d", "data", "hot"),
-                ("a", "answer, or a\nstructured output\n(a filled-in form)", "normal"),
-                ("s", "the same tool\nserved over MCP", "hot"),
+                ("t", "tool call:\nget_indicator(indicator,\ncountry, start, end)", "hot"),
+                ("ms", "the same tool\nserved over MCP", "hot"),
                 ("c", "any MCP client\n(this notebook, a chatbot,\na desktop assistant)", "hot"),
             ],
-            [("q", "m"), ("m", "t"), ("t", "d"), ("d", "m", "above"), ("m", "a", "below"), ("s", "c")],
-            grid={"q": (0, 0), "m": (1, 0), "t": (2, 0), "d": (3, 0), "a": (4, 0), "s": (2, 1), "c": (3, 1)},
+            [("q", "s"), ("s", "pr"), ("pr", "m"), ("m", "a"), ("m", "t"), ("t", "d"), ("d", "pr"), ("ms", "c")],
+            grid={"q": (0, 0), "s": (1, 0), "pr": (2, 0), "m": (3, 0), "a": (4, 0), "d": (2, 1), "t": (3, 1), "ms": (3, 2), "c": (4, 2)},
+            caption="Light boxes: built in notebooks 01 to 03. Dark boxes: added in this notebook.",
         )
     if name == "agent":
         return Flow(
@@ -242,6 +245,8 @@ def render_svg(f: Flow) -> str:
         elif route == "elbow":
             ym = (ay + ah + by) / 2
             shape = f'<polyline points="{acx},{ay + ah} {acx},{ym} {bcx},{ym} {bcx},{by - 2}" fill="none"'
+        elif f.grid is not None and abs((ay + ah / 2) - (by + bh / 2)) < 1 and bx < ax:
+            shape = f'<line x1="{ax}" y1="{ay + ah / 2}" x2="{bx + bw + 2}" y2="{by + bh / 2}"'
         elif f.grid is None or abs((ay + ah / 2) - (by + bh / 2)) < 1:
             shape = f'<line x1="{ax + aw}" y1="{ay + ah / 2}" x2="{bx - 2}" y2="{by + bh / 2}"'
         elif by > ay:
