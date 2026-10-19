@@ -1073,7 +1073,7 @@ Four terms, in plain words:
 - A **workflow** is a fixed order of steps written in code: search, then look up, then write. Every run makes the same calls.
 - An **agent** is a model that chooses its own next step. It asks for a tool, sees the result, and decides what to do next, until it can answer. The agent here is built with LangGraph, a library for loops of this kind.
 - A **trace** is the list of every call the agent made and what came back.
-- A **step limit** (`recursion_limit` in LangGraph) is the number of steps after which a run is stopped, so that a loop that never ends cannot run for ever.
+- A **step limit** (`recursion_limit` in LangGraph) is the number of steps after which a run is stopped, so that a loop that never ends cannot run for ever. A step is one turn of the loop: the model's turn, or the tools' turn.
 
 ## The application after this notebook
 
@@ -1158,7 +1158,9 @@ print()
 w.show(w.final_text(result))
 '''),
     md("""
-The model chose the same five calls that the workflow made. The first column is the round: one message from the model, which can ask for several tools at once. Here it asked for all five in its first message, so they share round 1; in section 4, a call that fails takes a second round to correct. On a different question the model would choose differently. That is the point of an agent, and also its risk: the calls are not known in advance. The application can now let the model choose between its tools.
+The model chose the same five calls that the workflow made. On a different question it would choose differently. That is the point of an agent, and also its risk: the calls are not known in advance.
+
+The first column of the table is the round: one message from the model, which can ask for several tools at once. Here it asked for all five in its first message, so they share round 1; in section 4, a call that fails takes a second round to correct. The application can now let the model choose between its tools.
 
 ## 3. A question the tools cannot answer
 
@@ -1190,7 +1192,7 @@ The first row is the failed call, in round 1; the second is the retry that worke
 
 ## 5. A loop that never ends
 
-A model can also keep calling tools without ever answering. The step limit stops it: after the given number of steps, the run ends with an error (`GraphRecursionError`), and the application decides what to do next. It can answer with what it has, ask the user, or give up. The recorded scenario below is a model that never stops.
+A model can also keep calling tools without ever answering. The step limit stops it: after the given number of steps, the run ends with an error (`GraphRecursionError`), and the application decides what to do next. It can answer with what it has, ask the user, or give up. The recorded scenario below is a model that never stops: the cell sets the limit to 6, and the model keeps asking for tools until the loop is cut off.
 """),
     code('''
 from langgraph.errors import GraphRecursionError
