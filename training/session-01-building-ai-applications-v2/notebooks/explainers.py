@@ -504,6 +504,59 @@ def toolloop_svg():
 
 
 
+def workflows_svg():
+    """Static picture: a workflow (the order is written in code) beside an agent (the model chooses the next step)."""
+    W, H = 1000, 478
+    p = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}" style="max-width:100%;height:auto" font-family="{SANS}">',
+         f'<defs><marker id="ar" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="{BLUE}"/></marker></defs>',
+         f'<rect width="{W}" height="{H}" rx="12" fill="#ffffff" stroke="#e1e6ee"/>',
+         f'<text x="24" y="34" font-size="17" font-weight="700" fill="{INK}">Who decides the next step?</text>']
+
+    def box(x, y, w, h, lines, fill=PALE, stroke=BLUE, bold=False):
+        out = f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="9" fill="{fill}" stroke="{stroke}" stroke-width="1.8"/>'
+        for i, t in enumerate(lines):
+            yy = y + h / 2 + 5 + (i - (len(lines) - 1) / 2) * 17
+            out += f'<text x="{x + w / 2}" y="{yy}" text-anchor="middle" font-size="13.5" {"font-weight=\"700\" " if bold else ""}fill="{INK}">{escape(t)}</text>'
+        return out
+
+    def arrow(x1, y1, x2, y2, label="", col=BLUE, dy=-8):
+        out = f'<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{col}" stroke-width="2.2" marker-end="url(#ar)"/>'
+        if label:
+            out += f'<text x="{(x1 + x2) / 2}" y="{(y1 + y2) / 2 + dy}" text-anchor="middle" font-size="11.5" fill="{GREY}">{escape(label)}</text>'
+        return out
+
+    # a workflow
+    p.append(f'<text x="24" y="72" font-size="15" font-weight="700" fill="{BLUE}">A workflow: you write the order in code</text>')
+    xs = [24, 214, 424, 634, 824]
+    labels = [["question"], ["1 · search", "the documents"], ["2 · look up", "the four series"], ["3 · the model", "writes the answer"], ["answer"]]
+    for x, l in zip(xs, labels):
+        p.append(box(x, 90, 152, 56, l, fill=LIGHT if l == ["question"] or l == ["answer"] else PALE))
+    for a, b in zip(xs, xs[1:]):
+        p.append(arrow(a + 152, 118, b - 2, 118))
+    p.append(f'<text x="24" y="172" font-size="13" fill="{GREY}">The same calls, in the same order, on every run. The model is called once, to write.</text>')
+    p.append(f'<line x1="24" y1="196" x2="976" y2="196" stroke="#e1e6ee"/>')
+
+    # an agent
+    p.append(f'<text x="24" y="228" font-size="15" font-weight="700" fill="{BLUE}">An agent: the model chooses the next step, after seeing what came back</text>')
+    p.append(box(24, 296, 130, 56, ["question"], fill=LIGHT))
+    p.append(box(214, 276, 170, 96, ["the model", "decides what", "to do next"], fill=INK, stroke=INK))
+    p[-1] = p[-1].replace(f'fill="{INK}">', 'fill="#ffffff">').replace(f'<rect x="214" y="276" width="170" height="96" rx="9" fill="#ffffff"', f'<rect x="214" y="276" width="170" height="96" rx="9" fill="{INK}"')
+    p.append(box(560, 252, 200, 44, ["search_documents"], fill="#e4f3ea", stroke=CTX))
+    p.append(box(560, 352, 200, 44, ["get_indicator"], fill="#e4f3ea", stroke=CTX))
+    p.append(arrow(154, 324, 212, 324))
+    p.append(arrow(384, 300, 558, 276, "asks", dy=-9))
+    p.append(arrow(558, 290, 384, 314, "result comes back", dy=18))
+    p.append(arrow(384, 352, 558, 370, "or asks", dy=-9))
+    p.append(arrow(558, 384, 384, 366, "result comes back", dy=19))
+    p.append(box(830, 296, 146, 56, ["answer"], fill=LIGHT))
+    p.append(f'<line x1="384" y1="324" x2="400" y2="324" stroke="none"/>')
+    p.append(f'<path d="M299,372 L299,426 L903,426 L903,354" fill="none" stroke="{BLUE}" stroke-width="2.2" marker-end="url(#ar)"/>')
+    p.append(f'<text x="600" y="419" text-anchor="middle" font-size="11.5" fill="{GREY}">when it has enough, it answers in text</text>')
+    p.append(f'<text x="24" y="456" font-size="13" fill="{GREY}">The calls vary with the question. A step limit stops a loop that never ends; a trace lists every call and result.</text>')
+    p.append("</svg>")
+    return "".join(p)
+
+
 ALT = {
     "chunking": "Animation: the same Kenya brief cut two ways. Fixed 400-character windows end on a stranded heading and mix two sections; section chunks keep each heading with its paragraph.",
     "embeddings": "Animation: a chunk of text becomes a list of numbers, then a dot on a map where similar meaning sits close together; a question becomes a star and the two closest chunks are retrieved.",
@@ -511,6 +564,7 @@ ALT = {
     "before_after": "Diagram: the same question without context gets an answer with no source, no date and a blend of two measures; with the four country briefs as context it gets a dated answer that cites its source.",
     "metadata": "Diagram: one document in two parts. Its metadata, the header of the file, holds the date 2016-06-01; its text sounds current and ends 'The latest available figures are for 2015.' An application can filter and rank on the date field, but it does not read the text for age.",
     "toolloop": "Animation: the application sends the model the question and the list of tools; the model replies with a request for get_indicator with GDP per capita, Rwanda and 2023; the application runs the tool, which returns 1,061 with its source; the application hands that back and the model answers that it was 1,061 US dollars in 2023.",
+    "workflows": "Diagram: in a workflow the order of the calls is written in code: search the documents, look up the four series, the model writes the answer, the same on every run. In an agent the model decides the next step: it asks for search_documents or get_indicator, gets the result back, and answers in text when it has enough; a step limit stops a loop that never ends and a trace lists every call.",
     "desk": "Diagram: the four briefs of this notebook, about 1,024 tokens, fit inside the model's context window, while a real collection of thousands of documents cannot, so the application must choose what the model reads.",
 }
 

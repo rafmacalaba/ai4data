@@ -434,6 +434,32 @@ def print_trace(result: dict[str, Any], width: int = 150) -> None:
             print(f"   -> {text[:width]}{'…' if len(text) > width else ''}")
 
 
+def show_trace(result: dict[str, Any]) -> None:
+    """The tool calls of an agent run as a table: the step, the tool, what was asked, and what came back."""
+    answers = {m.tool_call_id: m for m in result["messages"] if isinstance(m, ToolMessage)}
+
+    def came_back(m: ToolMessage) -> str:
+        try:
+            r = json.loads(m.content) if isinstance(m.content, str) else m.content
+        except json.JSONDecodeError:
+            return str(m.content)[:60]
+        if isinstance(r, list):
+            return f"{len(r)} passages, first {r[0]['citation']}" if r else "no passages"
+        if "error" in r:
+            return f"error: {r['error']}"
+        obs = r.get("observations", [])
+        return f"{len(obs)} observations, {obs[0]['year']} to {obs[-1]['year']}, latest {obs[-1]['value']:,.1f}" if obs else "no observations"
+
+    rows, step = [], 0
+    for m in result["messages"]:
+        if isinstance(m, AIMessage) and m.tool_calls:
+            step += 1
+            for c in m.tool_calls:
+                asked = ", ".join(f"{k}={v}" for k, v in c["args"].items())
+                rows.append((step, c["name"], asked, came_back(answers[c["id"]]) if c["id"] in answers else ""))
+    show_table(["step", "tool", "what was asked", "what came back"], rows)
+
+
 def tool_results(result: dict[str, Any], name: str) -> list[dict[str, Any]]:
     """Parsed results of every call to the tool `name` in an agent run."""
     out = []

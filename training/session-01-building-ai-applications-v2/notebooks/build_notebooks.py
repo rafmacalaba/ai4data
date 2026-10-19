@@ -92,6 +92,7 @@ def explainer_md(name: str) -> str:
         "desk": explainers.desk_svg,
         "metadata": explainers.metadata_svg,
         "toolloop": explainers.toolloop_svg,
+        "workflows": explainers.workflows_svg,
     }[name]()
     return f"![{explainers.ALT[name]}](data:image/svg+xml;base64,{base64.b64encode(svg.encode()).decode()})"
 
@@ -1059,17 +1060,40 @@ NB05 = [
     md("""
 # 05 · Workflows and agents
 
-**Session 01 · notebook 5 of 6**
+**Session 01 · Building AI applications for research and data · notebook 5 of 6**
 
 ## Objective
 
-Give the application two tools, document search and indicator data, and compare two ways of deciding which to call: a fixed workflow written as a chain, and a LangGraph agent in which the model chooses. See how to bound the agent, inspect its decisions, and handle a failed call.
+Notebook 04 gave the model one tool and one question at a time. The main question of this session needs more than that: figures for two countries, which come from the tool, and context from the documents, which comes from the search of notebook 03. Someone has to decide which calls to make, and in what order. This notebook shows two ways of deciding, runs both on the main question, and then looks at what an answer built from several calls still lacks.
+
+The application so far can search a store of documents (notebook 03) and call a tool for exact numbers (notebook 04). Here the search becomes a second tool, next to the first, and the application gains the means to coordinate them.
+
+Four terms, in plain words:
+
+- A **workflow** is a fixed order of steps written in code: search, then look up, then write. Every run makes the same calls.
+- An **agent** is a model that chooses its own next step. It asks for a tool, sees the result, and decides what to do next, until it can answer. The agent here is built with LangGraph, a library for loops of this kind.
+- A **trace** is the list of every call the agent made and what came back.
+- A **step limit** (`recursion_limit` in LangGraph) is the number of steps after which a run is stopped, so that a loop that never ends cannot run for ever.
 
 ## The application after this notebook
 
 @@DIAGRAM:agent@@
 
-The model chooses between the two tools, in a fixed order in a chain or by its own choice, with a recursion limit and a trace.
+## What you will see
+
+Seven short scenes:
+
+1. A workflow answering the main question, with each step printed as it runs.
+2. An agent answering the same question: the same calls, chosen by the model, shown as a trace table.
+3. A question that the tools cannot answer, and what the agent does.
+4. A call that fails, and how the agent recovers.
+5. A loop that never ends, stopped by the step limit.
+6. A comparison: when a workflow is the better design and when an agent is.
+7. A look at the answer: where did each number come from, and which numbers cannot be traced?
+
+## How to run it
+
+Run the cells in order. The model's answers are recorded ones, labelled `[recorded output: ...]`, as in notebook 01. The searches, the tool results, the tables and the checks are computed when you run the cell. The exercises at the end run without a key.
 """),
     code(SETUP),
     code('''
@@ -1079,9 +1103,9 @@ from langchain_core.messages import HumanMessage
 from langchain_core.prompts import ChatPromptTemplate
 
 docs = w.load_documents()
-store = w.build_store(w.split_sections(docs))
-search_documents = w.make_search_tool(store, k=3, since="2020")
-tools = [search_documents, w.get_indicator]
+store = w.build_store(w.split_sections(docs))   # the store of notebooks 02 and 03
+search_documents = w.make_search_tool(store, k=3, since="2020")   # the search of notebook 03, offered as a tool
+tools = [search_documents, w.get_indicator]   # the tool of notebook 04 is the second one
 
 INSTRUCTIONS = """You are a research assistant for development data.
 Use get_indicator for every statistic and search_documents for definitions, context, and explanations.
@@ -1089,9 +1113,11 @@ Name the indicator and the source with each figure; cite passages in the square-
 If the tools do not provide what is needed, say so. Do not quote figures from memory."""
 '''),
     md("""
-## 1. A fixed workflow
+## 1. A workflow: the order is written in code
 
-The order of calls is written in code: search the documents, fetch the four series, compose. The model is called once, to write. Every run makes the same calls.
+The picture contrasts the two designs. In a workflow, the steps are written in code in advance: search the documents, look up the four series, then ask the model to write. The model is called once, at the end, and every run makes the same calls. The cell runs the workflow on the main question and prints each step as it happens.
+
+@@EXPLAINER:workflows@@
 """),
     code('''
 compose = ChatPromptTemplate.from_messages([("system", INSTRUCTIONS), ("human", "PASSAGES:\\n{passages}\\n\\nDATA:\\n{data}\\n\\nQUESTION: {question}")]) | model
@@ -1099,61 +1125,72 @@ compose = ChatPromptTemplate.from_messages([("system", INSTRUCTIONS), ("human", 
 
 def fixed_workflow(question):
     passages = search_documents.invoke({"query": question})
+    print(f"step 1: searched the documents, found {len(passages)} passages")
     series = [w.indicator_lookup(i, c, start=2010) for i in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"] for c in ["Kenya", "Rwanda"]]
-    return compose.invoke({
+    print(f"step 2: looked up {len(series)} series: internet use and GDP per capita, for Kenya and Rwanda")
+    answer = compose.invoke({
         "passages": "\\n\\n".join(f"{p['citation']}\\n{p['text']}" for p in passages),
         "data": json.dumps(series),
         "question": question,
     })
+    print("step 3: the model wrote the answer\\n")
+    return answer, series
 
 
 w.use("nb05_compose")
-w.show(fixed_workflow(w.MAIN_QUESTION))
+workflow_answer, workflow_series = fixed_workflow(w.MAIN_QUESTION)
+w.show(workflow_answer)
 '''),
     md("""
-## 2. The model chooses the tools
+The application can now answer the main question with a fixed set of steps. It is predictable: the same question makes the same calls, so it is easy to test.
 
-`create_agent` builds a LangGraph agent: the model is offered the tools with their schemas, the graph runs what it asks for, feeds the results back, and stops when the model answers in text. The trace lists every call and result.
+## 2. An agent: the model chooses the steps
+
+In an agent, the model is offered the tools and their descriptions, and chooses. `create_agent` builds the loop with LangGraph: the model replies with the calls it wants, the loop runs them, the results go back to the model, and the loop stops when the model answers in text. The cell asks the same question, then shows the trace as a table, one row per call.
 """),
     code('''
 agent = create_agent(model, tools, system_prompt=INSTRUCTIONS)
 
 w.use("nb05_agent_main")
 result = agent.invoke({"messages": [HumanMessage(content=w.MAIN_QUESTION)]}, config={"recursion_limit": 10})
-w.print_trace(result)
+w.show_trace(result)
 print()
 w.show(w.final_text(result))
 '''),
     md("""
-The model chose the same calls the fixed workflow made, in one step. On a different question it would choose differently, which is the point and the risk.
+The model chose the same five calls that the workflow made, all in one step. On a different question it would choose differently. That is the point of an agent, and also its risk: the calls are not known in advance. The application can now let the model choose between its tools.
 
-## 3. A question outside the tools
+## 3. A question the tools cannot answer
 
-The planted out-of-scope question. A good agent searches, finds nothing usable, and says so.
+A good agent searches, finds nothing usable, and says so. The question is about coffee exports. The collection holds one note on coffee that carries no figures, and the data tool has no series on exports.
 """),
     code('''
 w.use("nb05_agent_offscope")
 result = agent.invoke({"messages": [HumanMessage(content="How have Kenya's coffee export earnings changed in recent years?")]}, config={"recursion_limit": 10})
-w.print_trace(result)
+w.show_trace(result)
 print()
 w.show(w.final_text(result))
 '''),
     md("""
-## 4. A failed call
+The agent made one search, read what came back, and declined to invent figures. The application can now say that it cannot answer, and what would be needed.
 
-The model asks for an indicator id that does not exist. The tool returns an error object; the model reads it and retries with the right id. Returning errors as data is what lets the loop recover.
+## 4. A call that fails
+
+The model asks for an indicator id that does not exist. The tool does not crash: it returns an error as data, with the list of valid ids. The model reads it and tries again. Returning errors as data is what lets the loop recover.
 """),
     code('''
 w.use("nb05_agent_error")
 result = agent.invoke({"messages": [HumanMessage(content="What share of Rwanda's population used the internet in 2023?")]}, config={"recursion_limit": 10})
-w.print_trace(result)
+w.show_trace(result)
 print()
 w.show(w.final_text(result))
 '''),
     md("""
-## 5. Bounding the loop
+The first row is the failed call, the second the retry that worked. The application can now recover from a wrong call, as long as its tools return errors that the model can read.
 
-LangGraph's `recursion_limit` caps the number of graph steps. When a model keeps calling tools, the run stops with `GraphRecursionError`, and the application decides what to do then: answer with what it has, ask the user, or fail. The recorded scenario below is a model that never stops.
+## 5. A loop that never ends
+
+A model can also keep calling tools without ever answering. The step limit stops it: after the given number of steps, the run ends with an error (`GraphRecursionError`), and the application decides what to do next. It can answer with what it has, ask the user, or give up. The recorded scenario below is a model that never stops.
 """),
     code('''
 from langgraph.errors import GraphRecursionError
@@ -1163,29 +1200,81 @@ try:
     agent.invoke({"messages": [HumanMessage(content=w.MAIN_QUESTION)]}, config={"recursion_limit": 6})
 except GraphRecursionError as e:
     print("stopped:", str(e)[:80])
+    print("The application now chooses: here, it tells the user that it could not finish.")
 '''),
     md("""
+The application can now stop a loop that does not end, instead of waiting for it.
+
 ## 6. Choosing between the two
 
-| | Fixed workflow | Agent |
+| | Workflow | Agent |
 |---|---|---|
 | Calls per run | Known in advance | Varies with the question |
 | Behaviour on a new kind of question | Same calls, possibly irrelevant | Adapts, possibly wrongly |
-| Cost | Predictable | Bounded by the recursion limit |
-| Testing | Test the composer | Test the trace and the answer |
+| Cost | Predictable | Bounded by the step limit |
+| Testing | Test the final step and the data | Test the trace and the answer |
 | Use when | The questions have one shape | The questions vary and the tools are few and safe |
 
-The worked example has one shape, so the fixed workflow is the right design for it. The agent earns its place when users ask questions the designer did not anticipate, and only with a recursion limit, a trace, and tools that fail as data.
+The worked example has one shape, so a workflow is the right design for it. The agent earns its place when users ask questions the designer did not anticipate, and only with a step limit, a trace, and tools that fail as data.
+
+## 7. Where did each number come from?
+
+Both designs produce an answer that holds several numbers. Some come straight from a tool, some come from a passage, and some are worked out by the model itself: "has risen by about 28 percentage points" is a subtraction, which no tool returned. A reader, or a program, has no way to tell which is which.
+
+The tool already helps. Every figure it returns carries a label, called a `claim_id`, made of the indicator, the country and the year. The cell shows the latest figure of each series that the workflow fetched.
+"""),
+    code('''
+latest = [(s["indicator"], s["country"], o["claim_id"], f"{o['value']:,.1f}" if o["value"] < 1000 else f"{o['value']:,.0f}") for s in workflow_series for o in s["observations"][-1:]]
+w.show_table(["indicator", "country", "claim_id", "value"], latest, source="Every figure the tool returns has a claim_id: indicator, country, year.")
+'''),
+    md("""
+Now a check that uses those labels. For each number in the workflow's answer, the cell looks for tool values that equal it once rounded to the same number of decimals, and lists their `claim_id`. Years are left out.
+"""),
+    code('''
+import re
+
+values = {o["claim_id"]: o["value"] for s in workflow_series for o in s["observations"]}
+
+
+def tool_values_matching(token):
+    """The claim_ids of the tool values that equal `token` when rounded to the same number of decimals."""
+    decimals = len(token.split(".")[1]) if "." in token else 0
+    number = float(token.replace(",", ""))
+    return [claim_id for claim_id, value in values.items() if round(value, decimals) == number]
+
+
+rows = []
+for token in w.NUMBER_RE.findall(workflow_answer.content):
+    if re.fullmatch(r"(19|20)\\d\\d", token):   # a year, not a figure
+        continue
+    found = tool_values_matching(token)
+    reading = "no match" if not found else "one match" if len(found) == 1 else "several matches"
+    rows.append((token, reading, " or ".join(found) if found else "none"))
+w.show_table(["number in the answer", "reading", "tool values it equals"], rows)
+'''),
+    md("""
+Four numbers match one tool value each, and they are right: the 2024 figures. The rest show what a check by value cannot do:
+
+- **28** is the rise in Kenya's internet use since 2010, a subtraction. It "matches" Rwanda's value for 2022, which happens to be 28.0. The check found a coincidence and called it a source.
+- **24** matches two different years of Rwanda's series. It is also a subtraction, and the check cannot say which year it means.
+- **7** is Rwanda's growth, quoted from a passage. It matches two tool values, Kenya's 2010 figure of 7.2 among them: coincidences again.
+- **80** is a percentage the model worked out. It matches nothing.
+
+The check cannot tell a source from a coincidence because the answer does not say which record each number comes from. Notebook 06 fixes that. The model is asked to attach each number's `claim_id` as it writes, and a verifier compares each number with exactly that record. A number with no label, or a label that does not hold the number, is flagged. The application can now see which of its numbers it cannot account for.
 
 ## Key points
 
-- A workflow written as a chain is predictable and testable; prefer it when the task has one shape.
-- An agent adapts to the question; bound it with a recursion limit, keep the trace, and return tool errors as data.
-- Both need the same two things from the tools: good descriptions and results the model can read.
+- A workflow is a fixed order of steps written in code: predictable and easy to test. Prefer it when the questions have one shape.
+- An agent is a model that chooses its next step. It adapts to the question, so it needs a step limit, a trace, and tools that return their errors as data.
+- Both designs need the same from their tools: clear descriptions and results the model can read.
+- An answer built from several calls mixes numbers that come from tools, from passages and from the model's own arithmetic. A claim_id label on each tool figure makes it possible to say where a number comes from, and checking by value alone cannot.
 
 ## Exercise
 
-Remove `w.get_indicator` from `tools` and rerun section 2. Read what the model does without a data tool and whether the instructions stop it from quoting figures from memory. In recorded mode, write down the expected behaviour; with a key, compare.
+1. In section 2, change `recursion_limit` from 10 to 3 and run the cell, then try 4. What is the smallest limit that lets this question finish? What does the application see when the limit is too low?
+2. After section 2, run `sum(len(m.tool_calls) for m in result["messages"] if getattr(m, "tool_calls", None))`. How many calls did the agent make, and how many did the workflow make in section 1? Why are the two numbers equal here, and when would they differ?
+3. Run `w.indicator_lookup("IT.NET.USER.ZS", "Uganda", start=2010)["observations"]`. The tool returns an empty list. What would the workflow of section 1 do with this result, and what would the agent do?
+4. After section 7, run `tool_values_matching("35")` and `tool_values_matching("27.8")`. The second is Kenya's rise since 2010, 35.0 minus 7.2, and it is correct. Why does the check find no match, and what would the application need in order to check a worked-out number?
 """),
     md(LINKS),
 ]

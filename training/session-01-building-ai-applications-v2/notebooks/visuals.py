@@ -62,7 +62,7 @@ def table_html(headers, rows, source=""):
         text = str(text)
         count = re.fullmatch(r"(\d+)/(\d+)", text)
         good = text == "hit" or (count and count.group(1) == count.group(2))
-        bad = text == "miss" or (count and count.group(1) != count.group(2))
+        bad = text in ("miss", "no match") or (count and count.group(1) != count.group(2))
         return ";font-weight:600;color:" + ("#1f6b43" if good else "#8e2b21") if good or bad else ""
 
     numeric = [all(align(row[i]) == "right" for row in rows) for i in range(len(headers))]   # a column of numbers is right-aligned, its header too
