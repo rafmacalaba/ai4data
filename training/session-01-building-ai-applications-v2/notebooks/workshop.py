@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import csv
 import json
+from IPython.display import HTML, display
 import os
 import re
 import textwrap
@@ -531,6 +532,44 @@ def show_checks(checks: list[ClaimCheck]) -> None:
     rows = [(c.text, c.claim_id or "no tag", c.detail.replace("record holds ", "").replace("no claim tag, so no mark is drawn", "none"), c.status) for c in checks]
     counts = {s: sum(c.status == s for c in checks) for s in ("verified", "flagged", "unmarked")}
     show_table(["number", "claim_id", "the record holds", "mark"], rows, source=f"{counts['verified']} verified, {counts['flagged']} flagged, {counts['unmarked']} unmarked")
+
+
+def chat_html(question: str, answer: str, observations: dict[str, float]) -> str:
+    """The question and the answer as a chatbot draws them: a green check after each verified number, an amber warning after each flagged one, nothing after a number without a tag. Hovering a mark shows the record, as in the pcn-js `ClaimMark`."""
+    from html import escape
+
+    checks = [c for c in verify(answer, observations) if c.claim_id]
+    marks = iter(checks)
+    out, pos = [], 0
+    for m in CLAIM_RE.finditer(answer):
+        out.append(escape(answer[pos:m.start()]))
+        check = next(marks)
+        cid, policy, decimals = m.group(1), m.group(2) or "rounded", m.group(3)
+        _, country, year = (cid.split(":") + ["", "", ""])[:3]
+        rule = "exact match" if policy == "exact" else f"rounded to {decimals or 1} decimal" + ("" if decimals == "1" or not decimals else "s")
+        truth = observations.get(cid)
+        source = f"{truth:g}" if truth is not None else "no record"
+        if check.status == "verified":
+            glyph, colour = "✓", "#16a34a"
+            tip = f"Verified\nCountry: {country}\nDate: {year}\nSource value: {source}\nDisplay rule: {rule}"
+        else:
+            glyph, colour = "⚠", "#d97706"
+            tip = f"Value does not match source\nDisplayed: {check.text}\nSource value: {source}\nDisplay rule: {rule}"
+        out.append(f'<span style="border-bottom:2px dotted {colour};cursor:help" title="{escape(tip)}">{escape(m.group(4).strip())}<b style="color:{colour};margin-left:2px">{glyph}</b></span>')
+        pos = m.end()
+    out.append(escape(answer[pos:]))
+    bubble = "padding:10px 14px;border-radius:14px;margin:6px 0;max-width:88%;font:14px/1.6 Helvetica,Arial,sans-serif;color:#16315a"
+    return (
+        '<div style="background:#ffffff;border:1px solid #e1e6ee;border-radius:10px;padding:10px 14px">'
+        f'<div style="{bubble};background:#e8eefb;margin-left:auto">{escape(question)}</div>'
+        f'<div style="{bubble};background:#f3f4f6">{"".join(out)}</div>'
+        '<div style="font:12.5px Helvetica,Arial,sans-serif;color:#5b6b85;margin-top:6px">'
+        '<b style="color:#16a34a">✓</b> verified · <b style="color:#d97706">⚠</b> does not match its record · no mark: no tag. Hover a mark for the record.</div></div>'
+    )
+
+
+def show_chat(question: str, answer: str, observations: dict[str, float]) -> None:
+    display(HTML(chat_html(question, answer, observations)))
 
 
 def strip_claims(answer: str) -> str:

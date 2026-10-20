@@ -1292,7 +1292,7 @@ Four kinds of check, and where each has appeared:
 Five short scenes:
 
 1. A claim tag, step by step, and the model's answer to the main question with every number checked.
-2. A wrong number and a number with no tag: how the verifier marks them.
+2. A wrong number and a number with no tag: how the verifier marks them, and how a chatbot shows those marks to a reader.
 3. Two versions of the application, to be compared.
 4. The evaluation suite: the eight questions, and a table of results for each version.
 5. How to read the table, and what the suite does not cover.
@@ -1362,6 +1362,17 @@ w.show_checks(w.verify(flawed.content, observations))
 In an application built this way, the reader sees a mark beside each number. A flagged number is one the model changed. An unmarked number is one the model did not tie to a record, and the rule is that it gets no mark: no tag, no mark. The same holds for the numbers of notebook 05 that the model worked out itself, such as a rise of "about 28 percentage points". They have no single record, so they stay unmarked, and a reader knows to look at them.
 
 What the check says nothing about: whether the record is the right one for the question, whether the method behind it is sound, or whether the sentence around the number interprets it correctly. Those stay with the reader. The application can now flag a number that does not match its record, and leave unmarked a number that has no record.
+
+### How a chatbot shows the marks
+
+The table above is for the developer. A reader of a chatbot never sees it: the marks sit next to the numbers. The program also publishes the protocol for the web, as the JavaScript packages `@pcn-js/core` and `@pcn-js/ui` ([`worldbank/pcn`](https://github.com/worldbank/pcn)). Its `ClaimMark` component draws a green ✓ after a number that matches its record and an amber ⚠ after one that does not, and hovering over the mark shows the record: country, date, source value and the display rule. The repository has a small demo chat app that uses it. The next cell imitates that view in the notebook, with the two answers of this section. Hover over a mark to see the tooltip.
+"""),
+    code('''
+w.show_chat(w.MAIN_QUESTION, reply.content, observations)    # the answer of section 1
+w.show_chat(w.MAIN_QUESTION, flawed.content, observations)   # the answer with a wrong number and a number without a tag
+'''),
+    md("""
+In the first answer every number carries a ✓. In the second, the altered Rwanda figure carries a ⚠, and "about 70 percent" carries nothing: the model gave no tag, so no mark is drawn. That absence is part of the design. The protocol's own principle reads: *trust is earned only by proof, and the absence of a verification mark communicates uncertainty.*
 
 ## 3. Two versions of the application
 
