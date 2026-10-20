@@ -1260,9 +1260,9 @@ NB06 = [
 
 ## Objective
 
-Notebook 05 ended on a question. The answer to the main question holds several numbers: some come from a tool, some from a passage, and some are worked out by the model. It is plain text, so nothing in it says which is which, and a reader cannot tell which numbers can be checked. The previous notebooks each added a layer of trust: retrieval found the right evidence (03), a tool returned exact figures (04), and a step limit and a trace bounded the agent (05). This notebook adds the last layer, a check on the numbers themselves.
+Notebook 05 ended on a question: what if every number in an answer carried its label, and a program checked each number against the record it names? The answer to the main question holds numbers from a tool, from a passage and from the model's own arithmetic, in plain text that does not say which is which. This notebook builds that check, and it is the last layer of trust. Retrieval found the right evidence (03), a tool returned exact figures (04), and a step limit and a trace bounded the agent (05). Now the numbers themselves are checked.
 
-The program has its own method for this, **Proof-Carrying Numbers**. The model labels each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
+The method is **Proof-Carrying Numbers**, from the program: the model labels each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
 
 Four terms, in plain words:
 
