@@ -203,7 +203,7 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 chain = prompt | model
 
-print(w.MAIN_QUESTION)
+w.show(w.MAIN_QUESTION)
 '''),
     md("""
 ## 2. Zero context: the model answers from its training data
@@ -404,7 +404,7 @@ d = next(d for d in docs if d.metadata["id"] == "regional-2016")
 for k in ("date", "type", "note"):
     print(f"{k:6s}", d.metadata[k])
 print()
-print(d.page_content)
+w.show(d.page_content)
 '''),
     md("""
 ## 3. Chunking: fixed windows against sections
@@ -425,9 +425,9 @@ sections = w.split_sections(kenya)
 print(f"fixed windows: {len(fixed)} chunks · sections: {len(sections)} chunks\\n")
 
 print("A fixed window (note where it starts and ends):\\n")
-print(repr(fixed[1].page_content))
+w.show(repr(fixed[1].page_content))
 print("\\nA section chunk:\\n")
-print(sections[1].page_content)
+w.show(sections[1].page_content)
 print("\\nmetadata:", sections[1].metadata["section"], "|", sections[1].metadata["date"], "|", sections[1].metadata["country"])
 '''),
     md("""
@@ -938,8 +938,9 @@ So far the model's answers are sentences, which suits a person. Suppose instead 
 import re
 
 first = re.findall(r"\\d[\\d,]*\\.?\\d*", final.content)[0]
-print("The answer:           ", final.content)
-print("The dashboard's box:  ", first)
+print("The answer:")
+w.show(final.content)
+print("\\nThe dashboard's box: ", first)
 '''),
     md("""
 The box gets 2023, which is the year and not a figure. The sentence holds three figures for different years, and the words around them change from one answer to the next, so a program reading a sentence has to guess which one is wanted.
@@ -1028,7 +1029,9 @@ The program's [Data360 MCP server](https://github.com/worldbank/data360-mcp) off
 try:
     async with Client(w.DATA360_MCP_URL) as client:
         tools = await client.list_tools()
-        print(len(tools), "tools, for example:", [t.name for t in tools][:5])
+        print(len(tools), "tools, for example:")
+        for t in tools[:5]:
+            print("  ", t.name)
         found = await client.call_tool("data360_search_indicators", {"query": "individuals using the internet", "limit": 3})
         for ind in found.data["indicators"]:
             print(f"  {ind['idno']:28s} {ind['name']}")
@@ -1335,7 +1338,7 @@ w.show_table(["claim_id", "value"], [(cid, f"{observations[cid]:g}") for cid in 
 w.use("nb06_claims_main")
 reply = model.invoke([SystemMessage(content=INSTRUCTIONS_CLAIMS), HumanMessage(content="DATA:\\n" + json.dumps(results) + "\\n\\nQUESTION: " + w.MAIN_QUESTION)])
 print("\\nWhat the model wrote, tags included:\\n")
-print(reply.content)
+w.show_tagged(reply.content)
 print("\\nAs the reader sees it:\\n")
 w.show(w.strip_claims(reply.content))
 print("\\nThe verifier's marks:\\n")

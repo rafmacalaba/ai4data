@@ -50,6 +50,7 @@ from visuals import (  # noqa: F401  (the tables and views the notebooks draw)
     show_form,
     show_prompt,
     show_ranking,
+    show_tagged,
     show_search_comparison,
     show_table,
     table_html,
@@ -421,7 +422,7 @@ def final_text(result: dict[str, Any]) -> str:
     return "(no final answer)"
 
 
-def print_trace(result: dict[str, Any], width: int = 150) -> None:
+def print_trace(result: dict[str, Any], width: int = 90) -> None:
     """Every tool call and result in an agent run, in order."""
     step = 0
     for m in result["messages"]:

@@ -187,6 +187,22 @@ def prompt_html(messages):
             + block("question", "from the user", question) + "</div>")
 
 
+def tagged_html(text):
+    """An answer with its claim tags: the text wraps to the page and each tag is drawn in blue, so that nothing needs scrolling sideways."""
+    import re
+
+    parts = re.split(r"(</?claim[^>]*>)", text)
+    body = "".join(
+        f'<span style="color:#1a56b0;font-weight:600">{escape(p)}</span>' if p.startswith(("<claim", "</claim")) else escape(p)
+        for p in parts
+    )
+    return f'<div style="{CARD};font:13.5px/1.7 Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word">{body}</div>'
+
+
+def show_tagged(text):
+    display(HTML(tagged_html(text)))
+
+
 def show_prompt(messages):
     display(HTML(prompt_html(messages)))
 
