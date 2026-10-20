@@ -1231,7 +1231,7 @@ latest = [(s["indicator"], s["country"], o["claim_id"], f"{o['value']:,.1f}" if 
 w.show_table(["indicator", "country", "claim_id", "value"], latest, source="Every figure the tool returns has a claim_id: indicator, country, year.")
 '''),
     md("""
-The labels are on the tool's side, and the answer does not use them yet. The program has its own way to close this gap, called **Proof-Carrying Numbers** (PCN), which its chatbot already uses. The model writes a small tag around each number that names the record it came from, and a verifier, the `pcn-core` package, checks the number against that record and marks it. Notebook 06 does this with the same package and the same comparison code.
+The labels sit on the tool's side, and nothing in the answer points back to them. What if every number in an answer carried its label, and a program checked each number against the record it names? The program has a method for exactly that, **Proof-Carrying Numbers**, and notebook 06 builds it into the application.
 
 ## Key points
 
@@ -1320,7 +1320,7 @@ If the question is ambiguous, ask which reading is meant."""
     md("""
 ## 1. Claim tags
 
-The instruction in the cell above asks the model to wrap each figure from the tool in a tag. The picture shows the parts of one tag, and what the verifier does with it: it takes the record named by the `claim_id`, compares it with the number inside the tag by the stated policy (rounded to some decimals, or exact), and marks the result. This is the Proof-Carrying Numbers protocol that the program's chatbot uses, with the same comparison code.
+The instruction in the cell above asks the model to wrap each figure from the tool in a tag. The picture shows the parts of one tag, and what the verifier does with it: it takes the record named by the `claim_id`, compares it with the number inside the tag by the stated policy (rounded to some decimals, or exact), and marks the result. This is the Proof-Carrying Numbers protocol of the program, and `pcn-core` is its comparison code.
 
 @@EXPLAINER:claimtag@@
 
@@ -1356,7 +1356,7 @@ print()
 w.show_checks(w.verify(flawed.content, observations))
 '''),
     md("""
-A reader of the program's chatbot sees a mark beside each number. A flagged number is one the model changed. An unmarked number is one the model did not tie to a record, and the rule is that it gets no mark: no tag, no mark. The same holds for the numbers of notebook 05 that the model worked out itself, such as a rise of "about 28 percentage points". They have no single record, so they stay unmarked, and a reader knows to look at them.
+In an application built this way, the reader sees a mark beside each number. A flagged number is one the model changed. An unmarked number is one the model did not tie to a record, and the rule is that it gets no mark: no tag, no mark. The same holds for the numbers of notebook 05 that the model worked out itself, such as a rise of "about 28 percentage points". They have no single record, so they stay unmarked, and a reader knows to look at them.
 
 What the check says nothing about: whether the record is the right one for the question, whether the method behind it is sound, or whether the sentence around the number interprets it correctly. Those stay with the reader. The application can now flag a number that does not match its record, and leave unmarked a number that has no record.
 
