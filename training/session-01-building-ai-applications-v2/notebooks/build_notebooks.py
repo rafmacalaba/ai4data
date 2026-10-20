@@ -58,7 +58,7 @@ STACK = """## The stack
 | Documents, splitting, embeddings, vector store, prompts, tools, structured output | [LangChain](https://python.langchain.com/) |
 | The agent loop | [LangGraph](https://langchain-ai.github.io/langgraph/), through `langchain.agents.create_agent` |
 | Tool server and client over the Model Context Protocol | [FastMCP](https://gofastmcp.com/) |
-| Number verification | [`pcn-core`](https://github.com/worldbank/pcn), the Python core of Proof-Carrying Numbers |
+| Number verification | [`pcn-core`](https://github.com/worldbank/pcn), the Python core of the Proof-Carrying Numbers protocol |
 | Output schemas | [Pydantic](https://docs.pydantic.dev/) |
 
 `workshop.py` holds what these do not: the worked-example data, a chat model that replays recorded outputs when no API key is configured, and a few printing and evaluation helpers."""
@@ -67,7 +67,7 @@ LINKS = """## Where this connects to the program
 
 - [Practical Guide to Serving Official Statistics to AI Agents](https://worldbank.github.io/ai4data/cookbook/serving-statistics-to-agents/): the design of tools over a statistical catalog, in full.
 - [Practical Guide to Evaluation Suites for Statistical AI](https://worldbank.github.io/ai4data/cookbook/evaluation-suites/): how to build and run the tests.
-- [Proof-Carrying Numbers](https://worldbank.github.io/ai4data/docs/pcn/): the claim-tag protocol the verifier in this session follows.
+- [Proof-Carrying Numbers](https://worldbank.github.io/ai4data/docs/pcn/): the claim-tag protocol the verifier in this session follows. See also the [paper](https://arxiv.org/abs/2509.06902) and the [`pcn` repository](https://github.com/worldbank/pcn).
 - [Data360 MCP server](https://github.com/worldbank/data360-mcp): the tools of notebook 04, exposed to any MCP client over the World Bank's data platform.
 - [End-to-end reference implementation](https://worldbank.github.io/ai4data/docs/reference-implementation/): documentation, validation, publication, agent access, and verification in one run."""
 
@@ -1231,7 +1231,7 @@ latest = [(s["indicator"], s["country"], o["claim_id"], f"{o['value']:,.1f}" if 
 w.show_table(["indicator", "country", "claim_id", "value"], latest, source="Every figure the tool returns has a claim_id: indicator, country, year.")
 '''),
     md("""
-The labels sit on the tool's side, and nothing in the answer points back to them. What if every number in an answer carried its label, and a program checked each number against the record it names? The program has a method for exactly that, **Proof-Carrying Numbers**, and notebook 06 builds it into the application.
+The labels sit on the tool's side, and nothing in the answer points back to them. What if every number in an answer carried its label, and a program checked each number against the record it names? The program has a protocol for exactly that, **Proof-Carrying Numbers** (PCN), its approach to trustworthy data, and notebook 06 builds it into the application.
 
 ## Key points
 
@@ -1262,12 +1262,12 @@ NB06 = [
 
 Notebook 05 ended on a question: what if every number in an answer carried its label, and a program checked each number against the record it names? The answer to the main question holds numbers from a tool, from a passage and from the model's own arithmetic, in plain text that does not say which is which. This notebook builds that check, and it is the last layer of trust. Retrieval found the right evidence (03), a tool returned exact figures (04), and a step limit and a trace bounded the agent (05). Now the numbers themselves are checked.
 
-The method is **Proof-Carrying Numbers**, from the program: the model labels each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
+The protocol is **Proof-Carrying Numbers** (PCN), the program's approach to trustworthy data ([paper](https://arxiv.org/abs/2509.06902), [code](https://github.com/worldbank/pcn)): the model labels each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
 
 Four terms, in plain words:
 
 - A **claim tag** is a label that the model writes around a number: it names the record the number comes from, and how exactly to compare the two. The tag is the `claim_id` of notebook 05 with a little more.
-- A **verifier** reads the tags and checks each number against its record. The one here is `pcn-core`, the Python core of the program's Proof-Carrying Numbers (PCN). Each number gets a mark: **verified** (it matches its record), **flagged** (it does not) or **unmarked** (it has no tag, so there is nothing to check it against).
+- A **verifier** reads the tags and checks each number against its record. The one here is `pcn-core`, the Python core of the PCN protocol. Each number gets a mark: **verified** (it matches its record), **flagged** (it does not) or **unmarked** (it has no tag, so there is nothing to check it against).
 - An **evaluation suite** is a fixed list of questions, each with the evidence and the behaviour that a good answer needs. The application runs on every question, and a table shows how it did.
 - A **configuration** is one version of the application. The suite compares two.
 
