@@ -1263,7 +1263,7 @@ Four numbers match one tool value each, and they are right: the 2024 figures. Th
 - **7** is Rwanda's growth, quoted from a passage. It matches two tool values, Kenya's 2010 figure of 7.2 among them: coincidences again.
 - **80** is a percentage the model worked out. It matches nothing.
 
-The check cannot tell a source from a coincidence because the answer does not say which record each number comes from. Notebook 06 fixes that. The model is asked to attach each number's `claim_id` as it writes, and a verifier compares each number with exactly that record. A number with no label, or a label that does not hold the number, is flagged. The application can now see which of its numbers it cannot account for.
+The check cannot tell a source from a coincidence because the answer does not say which record each number comes from. Notebook 06 adds that. The model is asked to attach each number's `claim_id` as it writes, and a verifier compares each number with exactly that record. A number with no label, or a label that does not hold the number, is flagged. The application can now see which of its numbers it cannot account for.
 
 ## Key points
 
@@ -1293,9 +1293,9 @@ NB06 = [
 
 ## Objective
 
-Notebook 05 ended on a problem. The answer of the main question holds several numbers, and a check by value cannot tell which come from a source: it matched "28" to a value that merely happened to be 28.0, and found nothing for "80". The cause was that the answer never said which record each number came from.
+Notebook 05 ended on a limit of its check. The answer of the main question holds several numbers, and a check by value cannot tell which of them come from a source: it matched "28" to a value that merely happened to be 28.0, and found nothing for "80". Nothing in the answer was wrong; the check had too little to go on, because the answer never said which record each number came from.
 
-This notebook fixes that. The model is asked to label each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
+This notebook strengthens the check. The model is asked to label each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
 
 Four terms, in plain words:
 
