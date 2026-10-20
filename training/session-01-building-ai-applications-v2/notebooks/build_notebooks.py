@@ -1327,52 +1327,41 @@ The instruction in the cell above asks the model to wrap each figure from the to
 
 @@EXPLAINER:claimtag@@
 
-The cell gives the model the four series that the main question needs, and shows what it wrote, tags included, then the answer as a reader sees it, then the verifier's marks.
+The next cell gives the model the four series that the main question needs and runs it. What comes back is drawn the way a chatbot would draw it: the answer as a reader sees it, with a small mark after each number that the application could check. Hover over a mark to see why it is there: which record the model named, where the tool got it, and how the two were compared. The labels themselves are folded away under the answer, for anyone who wants to see what the model really wrote.
 """),
     code('''
 results = [w.indicator_lookup(i, c, start=2010) for i in ["IT.NET.USER.ZS", "NY.GDP.PCAP.CD"] for c in ["Kenya", "Rwanda"]]
 observations = w.observations_from_results(results)   # claim_id -> the value the tool returned
-print(len(observations), "records available to the verifier; for example:")
-w.show_table(["claim_id", "value"], [(cid, f"{observations[cid]:g}") for cid in list(observations)[:3]])
 
 w.use("nb06_claims_main")
 reply = model.invoke([SystemMessage(content=INSTRUCTIONS_CLAIMS), HumanMessage(content="DATA:\\n" + json.dumps(results) + "\\n\\nQUESTION: " + w.MAIN_QUESTION)])
-print("\\nWhat the model wrote, tags included:\\n")
-w.show_tagged(reply.content)
-print("\\nAs the reader sees it:\\n")
-w.show(w.strip_claims(reply.content))
-print("\\nThe verifier's marks:\\n")
+w.show_chat(w.MAIN_QUESTION, reply.content, observations, results, raw=True)
+'''),
+    md("""
+Every number carries a ✓. Behind each mark is a check that the application made on its own: the model named a record, the application looked the record up in what the tool returned, and compared the two by the rule in the label. The table lists those checks, one row per number: the record each label named, what the record holds, and the mark.
+"""),
+    code('''
 w.show_checks(w.verify(reply.content, observations))
 '''),
     md("""
-Every number carries its label, and every label holds. Why not simply look for a tool value equal to each number, without labels? Because a match by value cannot tell a source from a coincidence: "28", a subtraction the model did itself, equals Rwanda's 2022 value of 28.0, and a value-matching check would call that a source. With a label, the verifier reads which record the model meant instead of guessing. Years are not figures to check, so they are skipped. The application can now check every number that the model says comes from the tool.
+Why not simply look for a tool value equal to each number, without labels? Because a match by value cannot tell a source from a coincidence: "28", a subtraction the model did itself, equals Rwanda's 2022 value of 28.0, and a value-matching check would call that a source. With a label, the verifier reads which record the model meant instead of guessing. Years are not figures to check, so they are skipped. The application can now check every number that the model says comes from the tool.
 
-## 2. A wrong number, and a number with no tag
+The picture and the cell above follow the program's JavaScript packages for the web, `@pcn-js/core` and `@pcn-js/ui` ([`worldbank/pcn`](https://github.com/worldbank/pcn)), whose `ClaimMark` component draws the ✓ and the hover in a real chatbot. The repository has a small demo chat app that uses it. The notebook imitates that view with plain HTML, and the marks come from the Python verifier.
 
-Two things can go wrong, and the cell shows one of each. In this recorded answer, one tagged figure has been altered (Rwanda's internet use is given as 35.7 instead of 31.7), and one figure has no tag because it did not come from the data: "about 70 percent … use mobile money". The verifier flags the first. The second it marks **unmarked**: it carries no claim, so there is nothing to check it against, and no mark is drawn, whether or not it happens to be right.
+## 2. A wrong number, and a number with no label
+
+Two things can go wrong, and the cell shows one of each. In this recorded answer, one labelled figure has been altered (Rwanda's internet use is given as 35.7 instead of 31.7), and one figure has no label because it did not come from the data: "about 70 percent … use mobile money". The verifier flags the first with a ⚠. The second it marks **unmarked**: it carries no claim, so there is nothing to check it against, and no mark is drawn, whether or not it happens to be right.
 """),
     code('''
 w.use("nb06_claims_error")
 flawed = model.invoke([SystemMessage(content=INSTRUCTIONS_CLAIMS), HumanMessage(content="DATA:\\n" + json.dumps(results) + "\\n\\nQUESTION: " + w.MAIN_QUESTION)])
-w.show(w.strip_claims(flawed.content))
-print()
+w.show_chat(w.MAIN_QUESTION, flawed.content, observations, results)
 w.show_checks(w.verify(flawed.content, observations))
 '''),
     md("""
-In an application built this way, the reader sees a mark beside each number. A flagged number is one the model changed. An unmarked number is one the model did not tie to a record, and the rule is that it gets no mark: no tag, no mark. The same holds for the numbers of notebook 05 that the model worked out itself, such as a rise of "about 28 percentage points". They have no single record, so they stay unmarked, and a reader knows to look at them.
+Hover over the ⚠: the tooltip shows the record the model named, the figure the tool returned, and that the two are not equal. "About 70 percent" carries nothing. That absence is part of the design. The protocol's own principle reads: *trust is earned only by proof, and the absence of a verification mark communicates uncertainty.* The same holds for the numbers of notebook 05 that the model worked out itself, such as a rise of "about 28 percentage points". They have no single record, so they stay unmarked, and a reader knows to look at them.
 
 What the check says nothing about: whether the record is the right one for the question, whether the method behind it is sound, or whether the sentence around the number interprets it correctly. Those stay with the reader. The application can now flag a number that does not match its record, and leave unmarked a number that has no record.
-
-### How a chatbot shows the marks
-
-The table above is for the developer. A reader of a chatbot never sees it: the marks sit next to the numbers. The program also publishes the protocol for the web, as the JavaScript packages `@pcn-js/core` and `@pcn-js/ui` ([`worldbank/pcn`](https://github.com/worldbank/pcn)). Its `ClaimMark` component draws a green ✓ after a number that matches its record and an amber ⚠ after one that does not, and hovering over the mark shows the record: country, date, source value and the display rule. The repository has a small demo chat app that uses it. The next cell imitates that view in the notebook, with the two answers of this section. Hover over a mark to see the tooltip.
-"""),
-    code('''
-w.show_chat(w.MAIN_QUESTION, reply.content, observations)    # the answer of section 1
-w.show_chat(w.MAIN_QUESTION, flawed.content, observations)   # the answer with a wrong number and a number without a tag
-'''),
-    md("""
-In the first answer every number carries a ✓. In the second, the altered Rwanda figure carries a ⚠, and "about 70 percent" carries nothing: the model gave no tag, so no mark is drawn. That absence is part of the design. The protocol's own principle reads: *trust is earned only by proof, and the absence of a verification mark communicates uncertainty.*
 
 ## 3. Two versions of the application
 
