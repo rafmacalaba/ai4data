@@ -43,7 +43,7 @@ ALT = {
     "knowledge": "Diagram: documents, metadata, chunks, embeddings, then the vector store. Below, built in notebook 03: the question and the retrieved passages from the vector store feed the prompt, then the model and the answer.",
     "retrieval": "Diagram: the question goes to retrieval, a search of the vector store that returns the closest chunks as passages; the passages and the question go into the prompt, then to generation, where the model writes an answer with citations.",
     "tools": "Diagram: the question goes to a search of the store, which returns passages for the prompt; the prompt goes to the model. New in this notebook: the model can call the tool get_indicator with an indicator, a country and optional start and end years; the data it returns goes back into the prompt; the model answers with text or a structured output, a filled-in form that other software can read. Separately, the same tool is served over MCP to any MCP client, such as this notebook, a chatbot or a desktop assistant.",
-    "agent": "Diagram: the question goes to a model that chooses the next step. It can call search_documents, the search of notebook 03 now offered as a tool, which returns passages, or get_indicator, the tool of notebook 04, which returns data. The results go back to the model, which writes the answer. New in this notebook: the model chooses the steps, a step limit and a trace bound and record the loop, and the answer is checked for where each number came from.",
+    "agent": "Diagram: the question goes to a model that chooses the next step. It can call search_documents, the search of notebook 03 now offered as a tool, which returns passages, or get_indicator, the tool of notebook 04, which returns data. The results go back to the model, which writes the answer. New in this notebook: the model chooses the steps, a step limit and a trace bound and record the loop, and the answer ends on the question of whether its numbers can be trusted, which notebook 06 takes up.",
     "verification": "Diagram: the question goes to the agent with tools of notebook 05, which writes an answer with claim tags; the verifier, pcn-core, puts a mark on each number: verified, flagged or unmarked. Separately, the evaluation suite of eight questions produces a table per question for each configuration of the application.",
 }
 
@@ -132,7 +132,7 @@ def flow(name: str, stage: int | None = None) -> Flow:
                 ("m2", "the model writes", "normal"),
                 ("a", "answer", "normal"),
                 ("lim", "step limit\nand a trace", "hot"),
-                ("chk", "where did each\nnumber come from?", "hot"),
+                ("chk", "can we trust\nthe numbers?", "hot"),
             ],
             [("q", "m1"), ("m1", "s"), ("m1", "g"), ("s", "ps"), ("g", "dt"), ("ps", "m2"), ("dt", "m2"), ("m2", "a"), ("m1", "lim"), ("a", "chk")],
             grid={"q": (0, 0), "m1": (1, 0), "s": (2, 0), "ps": (3, 0), "m2": (4, 0), "a": (5, 0), "lim": (1, 1), "g": (2, 1), "dt": (3, 1), "chk": (5, 1)},

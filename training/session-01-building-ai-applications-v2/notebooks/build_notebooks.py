@@ -1090,7 +1090,7 @@ Seven short scenes:
 4. A call that fails, and how the agent recovers.
 5. A loop that never ends, stopped by the step limit.
 6. A comparison: when a workflow is the better design and when an agent is.
-7. A look at the answer: where did each number come from, and which numbers cannot be traced?
+7. A look at the answer: it mixes numbers from tools, passages and the model's own arithmetic. Can we trust them? The question for notebook 06.
 
 ## How to run it
 
@@ -1220,64 +1220,31 @@ The application can now stop a loop that does not end, instead of waiting for it
 
 The worked example has one shape, so a workflow is the right design for it. The agent earns its place when users ask questions the designer did not anticipate, and only with a step limit, a trace, and tools that fail as data.
 
-## 7. Where did each number come from?
+## 7. Can we trust the numbers?
 
-Both designs produce an answer that holds several numbers. Some come straight from a tool, some come from a passage, and some are worked out by the model itself: "has risen by about 28 percentage points" is a subtraction, which no tool returned. A reader, or a program, has no way to tell which is which.
+Both designs produce an answer that holds several numbers. Some come straight from a tool, some come from a passage, and some are worked out by the model itself: "has risen by about 28 percentage points" is a subtraction, which no tool returned. The answer is plain text, and a reader, or a program, has no way to tell which number is which.
 
-The tool already helps. Every figure it returns carries a label, called a `claim_id`, made of the indicator, the country and the year. The cell shows the latest figure of each series that the workflow fetched.
+The tools have already laid some groundwork. Every figure the data tool returns carries a label, called a `claim_id`, made of the indicator, the country and the year. The cell shows the latest figure of each series that the workflow fetched.
 """),
     code('''
 latest = [(s["indicator"], s["country"], o["claim_id"], f"{o['value']:,.1f}" if o["value"] < 1000 else f"{o['value']:,.0f}") for s in workflow_series for o in s["observations"][-1:]]
 w.show_table(["indicator", "country", "claim_id", "value"], latest, source="Every figure the tool returns has a claim_id: indicator, country, year.")
 '''),
     md("""
-Now a check that uses those labels. For each number in the workflow's answer, the cell looks for tool values that equal it once rounded to the same number of decimals, and lists their `claim_id`. Years are left out.
-"""),
-    code('''
-import re
-
-values = {o["claim_id"]: o["value"] for s in workflow_series for o in s["observations"]}
-
-
-def tool_values_matching(token):
-    """The claim_ids of the tool values that equal `token` when rounded to the same number of decimals."""
-    decimals = len(token.split(".")[1]) if "." in token else 0
-    number = float(token.replace(",", ""))
-    return [claim_id for claim_id, value in values.items() if round(value, decimals) == number]
-
-
-rows = []
-for token in w.NUMBER_RE.findall(workflow_answer.content):
-    if re.fullmatch(r"(19|20)\\d\\d", token):   # a year, not a figure
-        continue
-    found = tool_values_matching(token)
-    reading = "no match" if not found else "one match" if len(found) == 1 else "several matches"
-    rows.append((token, reading, " or ".join(found) if found else "none"))
-w.show_table(["number in the answer", "reading", "tool values it equals"], rows)
-'''),
-    md("""
-Four numbers match one tool value each, and they are right: the 2024 figures. The rest show what a check by value cannot do:
-
-- **28** is the rise in Kenya's internet use since 2010, a subtraction. It "matches" Rwanda's value for 2022, which happens to be 28.0. The check found a coincidence and called it a source.
-- **24** matches two different years of Rwanda's series. It is also a subtraction, and the check cannot say which year it means.
-- **7** is Rwanda's growth, quoted from a passage. It matches two tool values, Kenya's 2010 figure of 7.2 among them: coincidences again.
-- **80** is a percentage the model worked out. It matches nothing.
-
-The check cannot tell a source from a coincidence because the answer does not say which record each number comes from. Notebook 06 adds that. The model is asked to attach each number's `claim_id` as it writes, and a verifier compares each number with exactly that record. A number with no label, or a label that does not hold the number, is flagged. The application can now see which of its numbers it cannot account for.
+The labels are on the tool's side, and the answer does not use them yet. The program has its own way to close this gap, called **Proof-Carrying Numbers** (PCN), which its chatbot already uses. The model writes a small tag around each number that names the record it came from, and a verifier, the `pcn-core` package, checks the number against that record and marks it. Notebook 06 does this with the same package and the same comparison code.
 
 ## Key points
 
 - A workflow is a fixed order of steps written in code: predictable and easy to test. Prefer it when the questions have one shape.
 - An agent is a model that chooses its next step. It adapts to the question, so it needs a step limit, a trace, and tools that return their errors as data.
 - Both designs need the same from their tools: clear descriptions and results the model can read.
-- An answer built from several calls mixes numbers that come from tools, from passages and from the model's own arithmetic. A claim_id label on each tool figure makes it possible to say where a number comes from, and checking by value alone cannot.
+- An answer built from several calls mixes numbers that come from tools, from passages and from the model's own arithmetic, and plain text does not say which is which. The labels the tool already attaches are the groundwork for checking that, in notebook 06.
 
 ## Exercise
 
 1. In section 2, change `recursion_limit` from 10 to 3 and run the cell, then try 4. What is the smallest limit that lets this question finish? What does the application see when the limit is too low?
 2. After section 2, run `sum(len(m.tool_calls) for m in result["messages"] if getattr(m, "tool_calls", None))`. How many calls did the agent make, and how many did the workflow make in section 1? Why are the two numbers equal here, and when would they differ?
 3. Run `w.indicator_lookup("IT.NET.USER.ZS", "Uganda", start=2010)["observations"]`. The tool returns an empty list. What would the workflow of section 1 do with this result, and what would the agent do?
-4. After section 7, run `tool_values_matching("35")` and `tool_values_matching("27.8")`. The second is Kenya's rise since 2010, 35.0 minus 7.2, and it is correct. Why does the check find no match, and what would the application need in order to check a worked-out number?
 """),
     md(LINKS),
 ]
@@ -1293,9 +1260,9 @@ NB06 = [
 
 ## Objective
 
-Notebook 05 ended on a limit of its check. The answer of the main question holds several numbers, and a check by value cannot tell which of them come from a source: it matched "28" to a value that merely happened to be 28.0, and found nothing for "80". Nothing in the answer was wrong; the check had too little to go on, because the answer never said which record each number came from.
+Notebook 05 ended on a question. The answer to the main question holds several numbers: some come from a tool, some from a passage, and some are worked out by the model. It is plain text, so nothing in it says which is which, and a reader cannot tell which numbers can be checked. The previous notebooks each added a layer of trust: retrieval found the right evidence (03), a tool returned exact figures (04), and a step limit and a trace bounded the agent (05). This notebook adds the last layer, a check on the numbers themselves.
 
-This notebook strengthens the check. The model is asked to label each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
+The program has its own method for this, **Proof-Carrying Numbers**. The model labels each number with the record it comes from, and a verifier checks each number against exactly that record. Then the notebook asks a second question, about the whole application and not one answer: how do we know that it behaves well across many questions, and that a change made it better and not worse? It answers with an evaluation suite, a fixed set of questions with known right evidence, run on two versions of the application and compared.
 
 Four terms, in plain words:
 
@@ -1375,7 +1342,7 @@ print("\\nThe verifier's marks:\\n")
 w.show_checks(w.verify(reply.content, observations))
 '''),
     md("""
-Every number carries its label, and every label holds. This is what the check of notebook 05 could not do: it matched numbers to values and guessed, and this one reads which record the model meant. Years are not figures to check, so they are skipped. The application can now check every number that the model says comes from the tool.
+Every number carries its label, and every label holds. Why not simply look for a tool value equal to each number, without labels? Because a match by value cannot tell a source from a coincidence: "28", a subtraction the model did itself, equals Rwanda's 2022 value of 28.0, and a value-matching check would call that a source. With a label, the verifier reads which record the model meant instead of guessing. Years are not figures to check, so they are skipped. The application can now check every number that the model says comes from the tool.
 
 ## 2. A wrong number, and a number with no tag
 
